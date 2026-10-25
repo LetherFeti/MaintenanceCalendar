@@ -90,11 +90,11 @@ public sealed class DayWindow : ToolWindow
     {
         try
         {
-            if (sender is not DataGridRow { Item: DayItem row } || string.IsNullOrWhiteSpace(row.Item.Photo))
+            if (sender is not DataGridRow gridRow || gridRow.Item is not DayItem item || string.IsNullOrWhiteSpace(item.Item.Photo))
             { e.Handled = true; return; }
-            var image = Services.LoadPhoto(row.Item.Photo);
+            var image = Services.LoadPhoto(item.Item.Photo);
             if (image is null) { e.Handled = true; return; }
-            row.ToolTip = new Image { Source = image, MaxWidth = 240, MaxHeight = 180, Stretch = Stretch.Uniform };
+            gridRow.ToolTip = new Image { Source = image, MaxWidth = 240, MaxHeight = 180, Stretch = Stretch.Uniform };
         }
         catch (Exception ex) { LogManager.GetCurrentClassLogger().Warn(ex, "Item photo preview failed"); e.Handled = true; }
     }
