@@ -22,22 +22,24 @@ public sealed class DayWindow : ToolWindow
     public DayWindow(DateTime date, IReadOnlyList<Item> items, long? selected) : base(date.ToString("yyyy年M月d日（ddd）"), 740, 610)
     {
         this.date = date;
-        MinWidth = 660; MinHeight = 550;
+        MinWidth = 660; MinHeight = 800;
         rows = items.Select(x => new DayItem(x)).ToList();
         visibleRows = CollectionViewSource.GetDefaultView(rows);
         visibleRows.Filter = MatchesFilter;
         AddTop(Ui.Text("使用・お手入れを記録", 17));
-        AddTop(Ui.Text("チェックした所持品をまとめて登録できます。登録済みの記録・メモは保持します。\n行を選ぶと、下の欄で個別に記録・取消・メモ編集ができます。"));
+
+        AddTop(Ui.Text("メーカー・モデル・色で検索"));
+        var filters = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
+        filters.Children.Add(search); filters.Children.Add(showUsed); filters.Children.Add(showCared);
+        AddTop(filters);
+
         var batchActions = new WrapPanel();
         batchActions.Children.Add(Ui.Button("CheckAllButton", "全チェック / 解除", Button_Click));
         batchUse = Ui.Button("BatchUseButton", "チェック分を使用登録", Button_Click); batchActions.Children.Add(batchUse);
         batchCare = Ui.Button("BatchCareButton", "チェック分をお手入れ登録", Button_Click); batchActions.Children.Add(batchCare);
         AddTop(batchActions); AddTop(batchStatus);
 
-        AddTop(Ui.Text("メーカー・モデル・色で検索"));
-        var filters = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        filters.Children.Add(search); filters.Children.Add(showUsed); filters.Children.Add(showCared);
-        AddTop(filters);
+
         search.TextChanged += (_, _) => RefreshFilter();
         showUsed.Checked += (_, _) => RefreshFilter(); showUsed.Unchecked += (_, _) => RefreshFilter();
         showCared.Checked += (_, _) => RefreshFilter(); showCared.Unchecked += (_, _) => RefreshFilter();
