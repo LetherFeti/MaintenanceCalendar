@@ -1,0 +1,101 @@
+using System.Collections;
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using MaintenanceCalendar;
+
+internal static class CalendarRecordCheck
+{
+    static int checks;
+    static void Assert(bool ok, string message) { if (!ok) throw new Exception(message); checks++; Console.WriteLine("PASS " + message); }
+    static T Field<T>(object target, string name) => (T)target.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(target)!;
+    static void Invoke(object target, string name) => target.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(target, null);
+    static T Prop<T>(object row, string name) => (T)row.GetType().GetProperty(name)!.GetValue(row)!;
+    static void Check(object row, bool value) => row.GetType().GetProperty("IsChecked")!.SetValue(row, value);
+    static void Click(Button b) => b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    static void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+    [STAThread]
+    static int Main()
+    {
+        try
+        {
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/MaintenanceCalendar;component/Views/Shared/ModernTheme.xaml", UriKind.Relative) });
+            var output = Path.GetFullPath("work/calendar-record-qa"); Directory.CreateDirectory(output);
+            AppServices.Current = new AppServices(Path.Combine(output, Guid.NewGuid().ToString("N")));
+            var services = AppServices.Current; var date = new DateTime(2026, 10, 12);
+            var first = new Item { Manufacturer = "メーカーA", Model = "モデル1" };
+            var second = new Item { Manufacturer = "メーカーB", Model = "モデル2" };
+            var unused = new Item { Manufacturer = "メーカーC", Model = "モデル3" };
+            var deleted = new Item { Manufacturer = "削除品", Model = "非表示" };
+            foreach (var item in new[] { first, second, unused, deleted }) services.Db.SaveItem(item);
+            services.Db.SaveHistory(date, first.Id, 1); services.Db.SaveHistory(date, first.Id, 2, "ブラッシング済み");
+            services.Db.SaveHistory(date, second.Id, 2, "既存メモ"); services.Db.SaveHistory(date, deleted.Id, 1);
+            services.Db.SetDeleted(new[] { deleted.Id }, true);
+            services.Db.ReplaceHolidays(new() { [date] = "スポーツの日", [date.AddDays(1)] = "検証用祝日" }); services.Settings.Apply();
+            var main = new MainWindow();
+            typeof(MainWindow).GetField("month", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(main, new DateTime(2026, 10, 1)); Invoke(main, "RefreshData");
+            Button Day(DateTime d) => ((UniformGrid)main.FindName("DaysPanel")).Children.OfType<Button>().Single(x => (DateTime)x.Tag == d);
+            var tooltip = (string)Day(date).ToolTip;
+            Assert(tooltip.Contains("スポーツの日") && !tooltip.Contains("2026"), "Tooltip retains holiday name and omits date");
+            Assert(tooltip.Contains("メーカーA モデル1：使用・お手入れ") && tooltip.Contains("メーカーB モデル2：お手入れ"), "Blank filter shows recorded items and work types");
+            Assert(!tooltip.Contains("削除品") && !tooltip.Contains("モデル3"), "Deleted and unrecorded items omitted from tooltip");
+            Assert((string)Day(date.AddDays(1)).ToolTip == "検証用祝日" && Day(date.AddDays(2)).ToolTip == null, "Holiday-only and empty tooltips preserved");
+            Field<ComboBox>(main, "combo").SelectedValue = second.Id;
+            Assert((string)Day(date).ToolTip == "スポーツの日\nメーカーB モデル2：お手入れ", "Selected filter applies to tooltip");
+
+            var items = services.Db.GetItems(); var day = new DayWindow(date, items, null); var grid = Field<DataGrid>(day, "grid");
+            var rows = grid.Items.Cast<object>().ToArray();
+            Assert(rows.Length == 3 && grid.SelectedItem == null, "Record list shows all active items without implicit single selection");
+            Assert(!Field<Button>(day, "batchUse").IsEnabled && !Field<Button>(day, "batchCare").IsEnabled, "Batch actions disabled without checks");
+            Assert(Prop<string>(rows[0], "UseStatus") == "✓ 登録済" && Prop<string>(rows[1], "UseStatus") == "未登録", "Each row shows registered and missing work");
+            // Exercise the real checkbox template and its two-way binding.
+            var template = ((DataGridTemplateColumn)grid.Columns[0]).CellTemplate; template.Seal();
+            var checkbox = (CheckBox)template.LoadContent(); checkbox.DataContext = rows[0]; Pump(); checkbox.IsChecked = true;
+            checkbox.GetBindingExpression(ToggleButton.IsCheckedProperty)!.UpdateSource();
+            Assert(Prop<bool>(rows[0], "IsChecked"), "Checkbox binding selects item in read-only status grid");
+            Check(rows[1], true);
+            Assert(Field<Button>(day, "batchUse").IsEnabled && !Field<Button>(day, "batchCare").IsEnabled, "Mixed selection enables only missing registration types");
+            Click(Field<Button>(day, "batchUse"));
+            Assert(services.Db.Day(date, second.Id).Count == 2 && services.Db.Day(date, first.Id).Count == 2, "Batch use registers missing checked item and preserves registered item");
+            Assert(!services.Db.Day(date, unused.Id).Any(), "Unchecked item remains unchanged");
+            Assert(rows.Take(2).All(x => Prop<bool>(x, "IsChecked") && Prop<bool>(x, "Used")), "Batch refresh preserves checks and updates statuses");
+            Assert(!Field<Button>(day, "batchUse").IsEnabled, "Completed batch action disables immediately");
+            Check(rows[2], true);
+            Assert(Field<Button>(day, "batchCare").IsEnabled, "Checking an item without care enables batch care");
+            int added = services.Db.SaveMissingHistory(date, new[] { first.Id, second.Id, unused.Id, unused.Id }, 2, "共通メモ");
+            Invoke(day, "Refresh");
+            Assert(added == 1 && services.Db.Day(date, unused.Id).Single().Memo == "共通メモ", "Batch care saves one missing record with common memo and deduplicates ids");
+            Assert(services.Db.Day(date, first.Id).Single(x => x.Work == 2).Memo == "ブラッシング済み" && services.Db.Day(date, second.Id).Single(x => x.Work == 2).Memo == "既存メモ", "Batch care preserves all existing memos");
+            Assert(!Field<Button>(day, "batchCare").IsEnabled && rows.All(x => Prop<bool>(x, "Cared")), "Care refresh displays complete status");
+            Assert(services.Db.SaveMissingHistory(date, items.Select(x => x.Id), 2, "上書きしない") == 0, "Repeated batch is idempotent");
+            try { services.Db.SaveMissingHistory(date.AddDays(1), new[] { first.Id, deleted.Id }, 1); throw new Exception("Expected validation error"); } catch (InvalidDataException) { }
+            Assert(!services.Db.Day(date.AddDays(1), first.Id).Any(), "Invalid batch does not partially save valid items");
+            grid.SelectedItem = rows[0];
+            Assert(Field<TextBox>(day, "memo").Text == "ブラッシング済み" && Field<Button>(day, "cancelCare").IsEnabled, "Row selection retains individual memo and cancellation");
+            Click(Field<Button>(day, "use"));
+            Assert(!services.Db.Day(date, first.Id).Any(x => x.Work == 1) && services.Db.Day(date, second.Id).Any(x => x.Work == 1), "Individual cancellation affects selected row only, regardless of checks");
+            var otherDay = new DayWindow(date.AddDays(1), items, first.Id);
+            Assert(Field<DataGrid>(otherDay, "grid").Items.Cast<object>().All(x => !Prop<bool>(x, "Used") && !Prop<bool>(x, "Cared")), "Statuses are isolated by date");
+            var checkAll = new Button { Name = "CheckAllButton" };
+            typeof(DayWindow).GetMethod("Button_Click", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(day, new object[] { checkAll, new RoutedEventArgs() });
+            Assert(rows.All(x => !Prop<bool>(x, "IsChecked")), "Clear-all resets checks");
+            typeof(DayWindow).GetMethod("Button_Click", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(day, new object[] { checkAll, new RoutedEventArgs() });
+            Assert(rows.All(x => Prop<bool>(x, "IsChecked")), "Check-all selects all active items");
+            var content = (Border)day.Content; content.Background = (Brush)app.Resources["CreamBrush"];
+            content.Measure(new Size(708, 578)); content.Arrange(new Rect(0, 0, 708, 578)); content.UpdateLayout(); Pump();
+            var bitmap = new RenderTargetBitmap(740, 610, 96, 96, PixelFormats.Pbgra32); bitmap.Render(content);
+            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(output, "day-records.png"))) encoder.Save(file);
+            Console.WriteLine($"{checks} checks passed"); Environment.Exit(0); return 0;
+        }
+        catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+}
+

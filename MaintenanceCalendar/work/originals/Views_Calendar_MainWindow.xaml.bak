@@ -1,0 +1,63 @@
+﻿<Window x:Class="MaintenanceCalendar.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MaintenanceCalendar"
+        mc:Ignorable="d"
+        Style="{StaticResource {x:Type Window}}"
+        Title="お手入れカレンダー" Width="380" Height="510" MinWidth="350" MinHeight="480"
+        PreviewMouseDown="Window_PreviewMouseDown" PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.ContextMenu>
+        <ContextMenu Opened="ContextMenu_Opened">
+            <MenuItem Name="MenuItems" Header="所持品マスタ" Click="Button_Click"/>
+            <MenuItem Name="MenuTemplates" Header="お手入れマスタ" Click="Button_Click"/>
+            <MenuItem Name="MenuHistory" Header="手入れ・使用履歴" Click="Button_Click"/>
+            <MenuItem Name="MenuDashboard" Header="ダッシュボード" Click="Button_Click"/>
+            <MenuItem Name="MenuSettings" Header="設定" Click="Button_Click"/>
+            <Separator/>
+            <MenuItem Name="MenuLock" Header="誤クリック予防" IsCheckable="True" Click="Button_Click"/>
+            <MenuItem Name="MenuExit" Header="終了" Click="Button_Click"/>
+        </ContextMenu>
+    </Window.ContextMenu>
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0">
+            <TextBlock Text="お手入れカレンダー" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Name="ItemsButton" Content="▤" ToolTip="所持品マスタ" Click="Button_Click"/>
+                <Button Name="DashboardButton" Content="▥" ToolTip="ダッシュボード" Click="Button_Click"/>
+                <Button Name="SettingsButton" Content="⚙" ToolTip="設定" Click="Button_Click"/>
+            </StackPanel>
+        </DockPanel>
+        <StackPanel Grid.Row="1">
+            <TextBlock Text="所持品  /  空欄で全アイテム" Margin="2,8,0,0"/>
+            <ContentControl Name="ComboHost"/>
+        </StackPanel>
+        <Border Grid.Row="2" Grid.RowSpan="3" CornerRadius="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" Margin="0,2"/>
+        <DockPanel Grid.Row="2" Margin="3,4,3,0">
+            <Button Name="PrevButton" Content="‹" Click="Button_Click" DockPanel.Dock="Left"/>
+            <Button Name="NextButton" Content="›" Click="Button_Click" DockPanel.Dock="Right"/>
+            <Button Name="TodayButton" Click="Button_Click" FontSize="16" FontWeight="SemiBold" Background="Transparent" BorderThickness="0"/>
+        </DockPanel>
+        <UniformGrid Grid.Row="3" Rows="1" Columns="7" Margin="0,6">
+            <TextBlock Text="日" Foreground="#BB3030" HorizontalAlignment="Center"/>
+            <TextBlock Text="月" HorizontalAlignment="Center"/><TextBlock Text="火" HorizontalAlignment="Center"/>
+            <TextBlock Text="水" HorizontalAlignment="Center"/><TextBlock Text="木" HorizontalAlignment="Center"/>
+            <TextBlock Text="金" HorizontalAlignment="Center"/><TextBlock Text="土" Foreground="#2859B0" HorizontalAlignment="Center"/>
+        </UniformGrid>
+        <UniformGrid Name="DaysPanel" Grid.Row="4" Rows="6" Columns="7" Margin="4,0,4,6"/>
+        <StackPanel Grid.Row="5" Margin="0,6,0,0">
+            <WrapPanel><TextBlock Name="TodayLegend" Margin="3"/><TextBlock Name="UseLegend" Margin="3"/><TextBlock Name="CareLegend" Margin="3"/></WrapPanel>
+            <TextBlock Text="重なり：使用の塗り円 ＋ 手入れの円枠" FontSize="10" Foreground="#66564C"/>
+            <TextBlock Name="LockStatus" Foreground="#A52A2A" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+        <DockPanel Grid.Row="6" Margin="0,4,0,0">
+            <Button Name="HistoryButton" Content="履歴" Click="Button_Click" DockPanel.Dock="Right"/>
+            <Button Name="DueButton" Content="通知" Click="Button_Click" Style="{StaticResource PrimaryButton}"/>
+        </DockPanel>
+    </Grid>
+</Window>

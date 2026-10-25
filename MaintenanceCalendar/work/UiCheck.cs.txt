@@ -1,0 +1,169 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using MaintenanceCalendar;
+
+internal static class UiCheck
+{
+    static readonly string Output = Path.GetFullPath("work/previews");
+    static int checks;
+    static void Assert(bool condition, string message) { if (!condition) throw new Exception(message); checks++; Console.WriteLine("PASS " + message); }
+    static void Pump(int ms = 80)
+    {
+        var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
+    }
+    static IEnumerable<DependencyObject> Tree(DependencyObject root)
+    {
+        yield return root;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) foreach (var child in Tree(VisualTreeHelper.GetChild(root, i))) yield return child;
+    }
+    static object? Field(object obj, string name) => obj.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(obj);
+    static void Refresh(MainWindow main) => typeof(MainWindow).GetMethod("RefreshData", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(main, null);
+    static Button Button(MainWindow main, string name) => (Button)main.FindName(name);
+    static void Click(Button button) => button.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+    static void Show(Window window)
+    {
+        window.Left = -10000; window.Top = -10000; window.ShowActivated = false; window.ShowInTaskbar = false; window.Show(); Pump();
+    }
+    static void Save(Window window, string name)
+    {
+        window.UpdateLayout();
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(window.ActualWidth), (int)Math.Ceiling(window.ActualHeight), 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(window); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(Path.Combine(Output, name + ".png")); encoder.Save(file);
+    }
+    static void SaveMenu(MainWindow main)
+    {
+        var menu=main.ContextMenu; menu.UpdateLayout();
+        var bitmap=new RenderTargetBitmap((int)Math.Ceiling(menu.ActualWidth),(int)Math.Ceiling(menu.ActualHeight),96,96,PixelFormats.Pbgra32);
+        bitmap.Render(menu); var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file=File.Create(Path.Combine(Output,"menu.png"));encoder.Save(file);
+    }
+    static IEnumerable<string> Texts(Window window) => Tree(window).OfType<TextBlock>().Select(x => x.Text);
+    static void OpenMenu(MainWindow main, string name, Type expected)
+    {
+        bool opened = false;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = Application.Current.Windows.Cast<Window>().FirstOrDefault(w => w != main && w.GetType() == expected);
+            if (dialog == null) return;
+            opened = true; dialog.Close(); timer.Stop();
+        };
+        timer.Start();
+        ((MenuItem)main.FindName(name)).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        timer.Stop(); Assert(opened, name + " routes to " + expected.Name);
+    }
+    [STAThread]
+    static int Main()
+    {
+        try
+        {
+            Directory.CreateDirectory(Output);
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/MaintenanceCalendar;component/Views/Shared/ModernTheme.xaml", UriKind.Relative) });
+            AppServices.Current = new AppServices(Path.GetFullPath("work/qa-data-" + Guid.NewGuid().ToString("N")));
+            var services = AppServices.Current; services.Settings.Apply();
+            var main = new MainWindow(); Show(main); Pump(250);
+            Assert(Button(main, "TodayButton").Content.ToString() == "今日", "Today is an independent labeled button");
+            Assert(!Tree(main).OfType<Button>().Any(x => x.Name == "HistoryButton"), "No bottom-right history button");
+            Assert(main.WindowStyle == WindowStyle.None, "Native title bar replaced");
+            using (var empty = new WindowScope(new DashboardWindow()))
+            {
+                Assert(Texts(empty.Window).Any(x => x.Contains("使用記録がありません")), "Empty dashboard explains zero data");
+                Pump(950); Save(empty.Window, "dashboard-empty");
+            }
+            services.Settings.ThemeColor = "#6554C0"; services.Settings.BackgroundColor = "#EFEDF8"; services.Settings.Apply();
+            var fixtures = new[] {
+                new Item { Manufacturer="日々の道具", Model="レザーバッグ", PurchaseDate=DateTime.Today.AddYears(-3), IntervalKey="M1" },
+                new Item { Manufacturer="暮らし", Model="スニーカー", PurchaseDate=DateTime.Today.AddYears(-1), IntervalKey="W1" },
+                new Item { Manufacturer="お気に入り", Model="腕時計", PurchaseDate=DateTime.Today.AddMonths(-6), IntervalKey="M3" },
+                new Item { Manufacturer="日々の道具", Model="コート", PurchaseDate=DateTime.Today.AddMonths(-2), IntervalKey="M12" }
+            };
+            for (int n=0;n<fixtures.Length;n++)
+            {
+                services.Db.SaveItem(fixtures[n]);
+                services.Db.SaveHistory(n == 0 ? DateTime.Today.AddMonths(-2) : DateTime.Today, fixtures[n].Id, 2, "ブラッシング・乾拭き");
+                int count = n < 2 ? 7 : n == 2 ? 2 : 1;
+                for (int d=0; d<count; d++) services.Db.SaveHistory(DateTime.Today.AddDays(-d), fixtures[n].Id, 1);
+            }
+            services.Db.SaveTemplate("ブラッシング", false); Refresh(main); Pump(250);
+            Assert(services.Db.UsageCounts().Sum(x => x.Count) == 17 && services.Db.Due(DateTime.Today).Count == 1, "Fixture has 17 uses and 1 due item");
+            var label = (TextBlock)main.FindName("MonthLabel"); string current = label.Text;
+            Click(Button(main, "PrevButton")); Assert(label.Text != current, "Previous month navigates");
+            Click(Button(main, "TodayButton")); Assert(label.Text == current, "Today returns to current month");
+            Click(Button(main, "NextButton")); Assert(label.Text != current, "Next month navigates");
+            Click(Button(main, "TodayButton"));
+            Save(main, "calendar-default-size");
+            foreach (var size in new[] { (350.0,480.0), (560.0,700.0) })
+            {
+                main.Width=size.Item1; main.Height=size.Item2; Pump();
+                var days=(System.Windows.Controls.Primitives.UniformGrid)main.FindName("DaysPanel");
+                Save(main, "calendar-" + size.Item1); Console.WriteLine("Day grid: " + days.ActualWidth + " x " + days.ActualHeight); Assert(days.ActualWidth>0 && days.ActualHeight / 6 >= 20, "Calendar retains flexible grid at " + size);
+                foreach(var b in Tree(main).OfType<Button>().Where(x=>x.IsVisible)) Assert(b.ActualWidth>0 && b.ActualHeight>0, "Button fits: " + b.Name);
+                Save(main, "calendar-" + size.Item1);
+            }
+            main.Width=390; main.Height=520; Pump();
+            Click(Button(main,"NavigationButton")); Pump();
+            Assert(main.ContextMenu.IsOpen, "Hamburger opens shared navigation");
+            foreach(string name in new[]{"MenuItems","MenuHistory","MenuDashboard","MenuSettings","MenuTemplates"}) Assert(((MenuItem)main.FindName(name)).Icon is Viewbox, name + " has vector icon");
+            SaveMenu(main); main.ContextMenu.IsOpen=false;
+            foreach(var route in new[]{("MenuItems",typeof(ItemsWindow)),("MenuHistory",typeof(HistoryWindow)),("MenuDashboard",typeof(DashboardWindow)),("MenuSettings",typeof(SettingsWindow)),("MenuTemplates",typeof(TemplatesWindow))}) OpenMenu(main,route.Item1,route.Item2);
+            var prevent=(MenuItem)main.FindName("MenuLock"); prevent.IsChecked=true; prevent.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Assert(!main.CanOpenDialogs,"Click prevention remains active");
+            string lockedMonth=label.Text; Click(Button(main,"PrevButton")); Assert(label.Text==lockedMonth,"Click prevention blocks month movement");
+            main.ContextMenu.IsOpen=true; Pump(); Assert(prevent.IsEnabled && !((MenuItem)main.FindName("MenuSettings")).IsEnabled,"Unlock remains available in context menu"); main.ContextMenu.IsOpen=false;
+            prevent.IsChecked=false; prevent.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent)); Assert(main.CanOpenDialogs,"Click prevention unlocks");
+            using(var dash=new WindowScope(new DashboardWindow()))
+            {
+                Pump(950); Save(dash.Window,"dashboard");
+                Assert(Texts(dash.Window).Count(x=>x.Contains("7回"))>=4,"Both tied usage leaders retained in graph and ranking");
+                var rings=Tree(dash.Window).Where(x=>x.GetType().Name=="DonutChart").ToList(); Assert(rings.Count==2,"Two real-data donut charts");
+                foreach(var ring in rings) Assert((double)ring.GetType().GetProperty("Progress")!.GetValue(ring)!>.99,"Donut animation completes");
+                dash.Window.Width=360; Pump(); Save(dash.Window,"dashboard-narrow");
+                var cards=Tree(dash.Window).OfType<Grid>().Single(x=>x.Children.Count==4 && x.Children.OfType<Border>().Count()==4);
+                Assert(cards.ColumnDefinitions.Count==1,"Dashboard changes to one column at minimum width");
+            }
+            // 上端ホバー・離脱によるタイトル領域の表示を、実際のWPFイベントで確認。
+            var edge=Tree(main).OfType<Border>().Single(x=>x.Height==12 && x.VerticalAlignment==VerticalAlignment.Top);
+            edge.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=Mouse.MouseEnterEvent}); Pump(250);
+            Assert(Tree(main).OfType<TextBlock>().Any(x=>x.Text.StartsWith("◷") && x.IsVisible),"Top-edge hover reveals title");
+            edge.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=Mouse.MouseLeaveEvent}); Pump(600);
+            Assert(!Tree(main).OfType<TextBlock>().Any(x=>x.Text.StartsWith("◷") && x.IsVisible),"Title automatically hides after pointer leaves");
+            var chrome=System.Windows.Shell.WindowChrome.GetWindowChrome(main);
+            Assert(chrome.ResizeBorderThickness.Left>0 && chrome.CaptionHeight==0,"Native resize border retained");
+            // タイトルのキーボード表示と自動非表示を確認。
+            main.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(main), Environment.TickCount, Key.F6) { RoutedEvent=Keyboard.PreviewKeyDownEvent }); Pump(250); Save(main,"calendar-title");
+            Assert(Tree(main).OfType<TextBlock>().Any(x=>x.Text.StartsWith("◷") && x.IsVisible),"F6 reveals themed title controls");
+            main.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(main), Environment.TickCount, Key.Escape) { RoutedEvent=Keyboard.PreviewKeyDownEvent }); Pump();
+            Assert(!Tree(main).OfType<TextBlock>().Any(x=>x.Text.StartsWith("◷") && x.IsVisible),"Escape hides title controls");
+            services.Settings.ThemeColor="#F0C96C"; services.Settings.BackgroundColor="#171D2A"; services.Settings.Apply(); Refresh(main); Pump(); Save(main,"calendar-dark");
+            Assert(((SolidColorBrush)app.Resources["AccentTextBrush"]).Color == (Color)ColorConverter.ConvertFromString("#172032"),"Light theme color uses dark title/button text");
+            foreach (var child in new Window[]{new ItemsWindow(),new TemplatesWindow(),new HistoryWindow(fixtures[0].Id),new SettingsWindow(),new DueWindow(),new DayWindow(DateTime.Today,fixtures,fixtures[0].Id),new CareMemoWindow("QA memo"),new ItemEditWindow(fixtures[0].Copy())})
+            { using(var scope = new WindowScope(child)) { Assert(Tree(child).OfType<Control>().Any(),child.GetType().Name+" renders with themed chrome"); } }
+            var combo=(ComboBox)Field(main,"combo")!; combo.SelectedValue=fixtures[0].Id; Pump(); Assert(combo.SelectedValue!.Equals(fixtures[0].Id),"Selected item filter remains available");
+            Assert(services.Db.Day(DateTime.Today,fixtures[0].Id).Count==1,"View interactions preserve fixture records");
+            services.Db.Validate(); Assert(true,"Fixture database remains valid");
+            main.Close(); app.Shutdown();
+            Console.WriteLine("SUCCESS " + checks + " checks; previews: " + Output); return 0;
+        }
+        catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    sealed class WindowScope : IDisposable
+    {
+        public Window Window {get;}
+        public WindowScope(Window window) {Window=window;Show(window);}
+        public void Dispose()=>Window.Close();
+    }
+}
+
+

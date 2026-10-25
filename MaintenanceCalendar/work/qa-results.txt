@@ -1,0 +1,122 @@
+PASS Today is an independent labeled button
+PASS No bottom-right history button
+PASS Native title bar replaced
+PASS Empty dashboard explains zero data
+PASS Fixture has 17 uses and 1 due item
+PASS Previous month navigates
+PASS Today returns to current month
+PASS Next month navigates
+Day grid: 308.8 x 141.6
+PASS Calendar retains flexible grid at (350, 480)
+PASS Button fits: NavigationButton
+PASS Button fits: PrevButton
+PASS Button fits: NextButton
+PASS Button fits: TodayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DueButton
+Day grid: 518.4 x 361.6
+PASS Calendar retains flexible grid at (560, 700)
+PASS Button fits: NavigationButton
+PASS Button fits: PrevButton
+PASS Button fits: NextButton
+PASS Button fits: TodayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DayButton
+PASS Button fits: DueButton
+PASS Hamburger opens shared navigation
+PASS MenuItems has vector icon
+PASS MenuHistory has vector icon
+PASS MenuDashboard has vector icon
+PASS MenuSettings has vector icon
+PASS MenuTemplates has vector icon
+PASS MenuItems routes to ItemsWindow
+PASS MenuHistory routes to HistoryWindow
+PASS MenuDashboard routes to DashboardWindow
+PASS MenuSettings routes to SettingsWindow
+PASS MenuTemplates routes to TemplatesWindow
+PASS Click prevention remains active
+PASS Click prevention blocks month movement
+PASS Unlock remains available in context menu
+PASS Click prevention unlocks
+PASS Both tied usage leaders retained in graph and ranking
+PASS Two real-data donut charts
+PASS Donut animation completes
+PASS Donut animation completes
+PASS Dashboard changes to one column at minimum width
+PASS Top-edge hover reveals title
+PASS Title automatically hides after pointer leaves
+PASS Native resize border retained
+PASS F6 reveals themed title controls
+PASS Escape hides title controls
+PASS Light theme color uses dark title/button text
+PASS ItemsWindow renders with themed chrome
+PASS TemplatesWindow renders with themed chrome
+PASS HistoryWindow renders with themed chrome
+PASS SettingsWindow renders with themed chrome
+PASS DueWindow renders with themed chrome
+PASS DayWindow renders with themed chrome
+PASS CareMemoWindow renders with themed chrome
+PASS ItemEditWindow renders with themed chrome
+PASS Selected item filter remains available
+PASS View interactions preserve fixture records
+PASS Fixture database remains valid
+SUCCESS 119 checks; previews: C:\Index\now\MaintenanceCalendar\MaintenanceCalendar\MaintenanceCalendar\work\previews

@@ -1,0 +1,15 @@
+{
+  "ThemeColor": "#795548",
+  "BackgroundColor": "#FFF8E7",
+  "TodayColor": "#B78A65",
+  "UseColor": "#C9E2CD",
+  "CareColor": "#B7D5ED",
+  "TodayShape": "\u25CF",
+  "HolidayFetchedAt": null,
+  "SidebarPosition": "Left",
+  "SidebarShowLabels": false,
+  "WindowLeft": null,
+  "WindowTop": null,
+  "WindowWidth": null,
+  "WindowHeight": null
+}

@@ -1,0 +1,22 @@
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# .NET build outputs
+**/bin/
+**/obj/
+
+# Runtime data and logs
+**/Data/
+**/Logs/
+
+# Local backups and work files
+**/work/
+*.bak
+
+# User-specific IDE files
+*.rsuser
+*.sln.ide

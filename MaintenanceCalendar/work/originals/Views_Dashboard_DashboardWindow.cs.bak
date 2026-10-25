@@ -1,0 +1,36 @@
+namespace MaintenanceCalendar;
+
+public sealed class DashboardWindow : ToolWindow
+{
+    /// <summary>
+    /// 有効な所持品の使用回数・購入日・期限到来件数を集計して表示します。
+    /// </summary>
+    public DashboardWindow() : base("ダッシュボード", 660, 510)
+    {
+        var panel = new StackPanel(); Root.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+
+        panel.Children.Add(Ui.Text("所持品のダッシュボード", 23));
+
+        panel.Children.Add(Ui.Text("削除されていない所持品を集計しています。"));
+
+        var items = Services.Db.GetItems().ToDictionary(x => x.Id); var usage = Services.Db.UsageCounts();
+
+        panel.Children.Add(Ui.Text("一番使用した所持品", 18));
+
+        if (usage.Count == 0) panel.Children.Add(Ui.Text("使用記録がありません。"));
+        else foreach (var row in usage.Where(x => x.Count == usage[0].Count)) panel.Children.Add(Ui.Text($"{items[row.Id].DisplayName}  /  {row.Count:N0}回", 16));
+
+        panel.Children.Add(Ui.Text("一番古くから使っている所持品", 18));
+
+        var purchased = items.Values.Where(x => x.PurchaseDate.HasValue).OrderBy(x => x.PurchaseDate).ToList();
+
+        if (purchased.Count == 0) panel.Children.Add(Ui.Text("購入日が登録されていません。"));
+        else foreach (var item in purchased.Where(x => x.PurchaseDate == purchased[0].PurchaseDate))
+        {
+            int days = (DateTime.Today - item.PurchaseDate!.Value.Date).Days;
+            panel.Children.Add(Ui.Text($"{item.DisplayName}\n購入日 {item.PurchaseDate:yyyy/MM/dd}  /  {(days >= 0 ? $"{days:N0}日経過" : $"購入予定まで{-days:N0}日")}", 16));
+        }
+
+        panel.Children.Add(Ui.Text($"登録中の所持品：{items.Count:N0}件\nお手入れ期限到来：{Services.Db.Due(DateTime.Today).Count:N0}件"));
+    }
+}

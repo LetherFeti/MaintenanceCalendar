@@ -1,0 +1,159 @@
+using System.Reflection;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using System.Windows.Input;
+using MaintenanceCalendar;
+
+internal static class SidebarCheck
+{
+    [DllImport("dwmapi.dll")]
+    static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+    static int checks;
+    static void Assert(bool ok, string message) { if (!ok) throw new Exception(message); Console.WriteLine("PASS " + message); checks++; }
+    static void Pump() { var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) }; timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); }
+    static void Invoke(object target, string name) => target.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(target, null);
+    static T Named<T>(MainWindow main, string name) => (T)main.FindName(name);
+    static Button Command(MainWindow main, string name) => Named<StackPanel>(main, "SidebarButtons").Children.OfType<Button>().Single(b => b.Name == name);
+    static void Click(Button b) => b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    static object Field(object target, string name) => target.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(target)!;
+    static void Key(TextBox input, Key key) => input.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(input), Environment.TickCount, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+    static IEnumerable<DependencyObject> Tree(DependencyObject root)
+    {
+        yield return root;
+        for (int i=0; i<VisualTreeHelper.GetChildrenCount(root); i++) foreach(var child in Tree(VisualTreeHelper.GetChild(root,i))) yield return child;
+    }
+    static void Save(MainWindow main, string name)
+    {
+        Pump(); main.UpdateLayout();
+        var bitmap = new RenderTargetBitmap((int)main.ActualWidth, (int)main.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(main);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var file = File.Create(Path.Combine("work", "previews", name + ".png")); encoder.Save(file);
+    }
+    [STAThread]
+    static int Main()
+    {
+        try
+        {
+            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/MaintenanceCalendar;component/Views/Shared/ModernTheme.xaml", UriKind.Relative) });
+            string root = Path.GetFullPath("work/sidebar-qa-" + Guid.NewGuid().ToString("N"));
+            AppServices.Current = new AppServices(root); var services = AppServices.Current;
+            // 旧設定の読み込みでも既定値で起動できます。
+            string legacy = Path.Combine(root, "legacy.json"); File.WriteAllText(legacy, "{\"ThemeColor\":\"#795548\"}");
+            Assert(Settings.Load(legacy).SidebarPosition == "Left", "Legacy settings default to left sidebar");
+            var main = new MainWindow { ShowActivated = false }; main.Show(); Pump();
+            var notifications = (NotificationService)Field(main, "notifications");
+            main.WindowState = WindowState.Minimized; Pump();
+            Assert(!main.ShowInTaskbar && main.WindowState == WindowState.Minimized, "Minimize removes main window from taskbar");
+            notifications.Restore(); Pump();
+            Assert(main.ShowInTaskbar && main.WindowState == WindowState.Normal, "Tray restore returns main window to taskbar");
+            main.WindowState = WindowState.Maximized; Pump(); main.WindowState = WindowState.Minimized; Pump(); notifications.Restore(); Pump();
+            Assert(main.WindowState == WindowState.Maximized, "Tray restore preserves maximized state");
+            main.WindowState = WindowState.Normal;
+            using (var scope = new TestWindow(new DashboardWindow { Owner = main }))
+            {
+                var close = Tree(scope.Window).OfType<Button>().Single(b => Equals(b.ToolTip,"閉じる"));
+                Assert(close.IsVisible, "Dashboard close button is visible without hover");
+                scope.Window.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(scope.Window), Environment.TickCount, System.Windows.Input.Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                Assert(close.IsVisible, "Escape does not hide child title bar");
+                scope.Window.WindowState = WindowState.Minimized; Pump();
+                Assert(main.WindowState == WindowState.Minimized && !main.ShowInTaskbar && !scope.Window.ShowInTaskbar, "Child minimize sends application to tray without child taskbar entry");
+                notifications.Restore(); Pump(); Assert(scope.Window.WindowState == WindowState.Normal, "Tray restore returns minimized child");
+            }
+            bool modalRestored = false;
+            var modal = new ItemEditWindow(new Item()) { Owner = main };
+            var modalTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) }; int stage = 0;
+            modalTimer.Tick += (_, _) =>
+            {
+                if (stage++ == 0) modal.WindowState = WindowState.Minimized;
+                else
+                {
+                    notifications.Restore();
+                    modalRestored = modal.IsVisible && modal.WindowState == WindowState.Normal;
+                    modalTimer.Stop(); modal.Close();
+                }
+            };
+            modalTimer.Start(); modal.ShowDialog(); modalTimer.Stop();
+            Assert(modalRestored && main.IsEnabled, "Tray restore preserves modal editing session");
+            using (var scope = new TestWindow(new ItemEditWindow(new Item()) { Owner = main }))
+            {
+                var maker = (TextBox)Field(scope.Window,"manufacturer"); var model = (TextBox)Field(scope.Window,"model");
+                var makerSuggestions = Field(scope.Window,"manufacturerSuggestions"); var modelSuggestions = Field(scope.Window,"modelSuggestions");
+                scope.Window.Activate(); maker.Focus(); maker.Text = "ni"; Pump();
+                var makerList = (ListBox)Field(makerSuggestions,"list");
+                Assert(((Popup)Field(makerSuggestions,"popup")).IsOpen && makerList.Items.Count == 1, "CSV manufacturer suggestions filter case-insensitively");
+                Key(maker, System.Windows.Input.Key.Tab);
+                Assert(maker.Text == "NIKE", "Tab commits manufacturer candidate");
+                model.Focus(); model.Text = "Air"; Pump();
+                var modelList = (ListBox)Field(modelSuggestions,"list");
+                Assert(modelList.Items.Count == 2, "Model candidates are filtered by manufacturer");
+                Key(model,System.Windows.Input.Key.Down); Key(model,System.Windows.Input.Key.Enter);
+                Assert(model.Text == "Air Max 90", "Down and Enter select model candidate");
+                model.Text = "Air"; Key(model,System.Windows.Input.Key.Escape);
+                Assert(model.Text == "Air" && !((Popup)Field(modelSuggestions,"popup")).IsOpen, "Escape dismisses suggestions without changing input");
+                model.Text = "自由入力"; Pump(); Assert(!((Popup)Field(modelSuggestions,"popup")).IsOpen && model.Text == "自由入力", "Unlisted models allow free input");
+                maker.Text = ""; model.Text = "Stan"; Pump(); Key(model,System.Windows.Input.Key.Enter);
+                Assert(maker.Text == "adidas" && model.Text == "Stan Smith", "Model selection fills an empty manufacturer");
+                scope.Window.UpdateLayout();
+                var bitmap = new RenderTargetBitmap((int)scope.Window.ActualWidth,(int)scope.Window.ActualHeight,96,96,PixelFormats.Pbgra32); bitmap.Render(scope.Window);
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var preview = File.Create("work/previews/item-suggestions.png"); encoder.Save(preview);
+            }
+            var catalogType = typeof(MainWindow).Assembly.GetType("MaintenanceCalendar.ItemCatalog")!;
+            string csv = Path.Combine(root,"quoted.csv"); File.WriteAllText(csv,"メーカー,モデル\n\"Test, Inc.\",\"Model \"\"A\"\"\"\n");
+            object catalog = Activator.CreateInstance(catalogType, csv)!;
+            Assert(((System.Collections.ICollection)catalogType.GetProperty("Entries")!.GetValue(catalog)!).Count == 1, "CSV supports quoted commas and escaped quotes");
+            File.WriteAllText(csv,"wrong,header\n"); catalog = Activator.CreateInstance(catalogType,csv)!;
+            Assert(catalogType.GetProperty("Error")!.GetValue(catalog) != null, "Malformed CSV falls back to manual entry");
+            Assert(DwmGetWindowAttribute(new WindowInteropHelper(main).Handle, 33, out int corners, sizeof(int)) == 0 && corners == 2, "Native rounded corner preference is applied");
+            Assert(Named<StackPanel>(main,"SidebarButtons").Children.Count == 8, "All seven commands and label toggle are visible");
+            Click(Command(main,"NavigationButton")); Pump();
+            Assert(services.Settings.SidebarShowLabels && Settings.Load(services.SettingsPath).SidebarShowLabels, "Label toggle persists immediately");
+            foreach (string position in new[] { "Left", "Right", "Top", "Bottom" })
+            {
+                services.Settings.SidebarPosition = position; Invoke(main,"RenderSidebar"); Pump();
+                Assert(DockPanel.GetDock(Named<Border>(main,"Sidebar")) == Enum.Parse<Dock>(position), position + " docking");
+                Assert(Named<StackPanel>(main,"SidebarButtons").Orientation == (position is "Top" or "Bottom" ? Orientation.Horizontal : Orientation.Vertical), position + " orientation");
+                Save(main, "sidebar-" + position.ToLowerInvariant());
+            }
+            Click(Command(main,"MenuLock"));
+            Assert(!main.CanOpenDialogs && !Command(main,"MenuSettings").IsEnabled && Command(main,"MenuLock").IsEnabled && Command(main,"MenuExit").IsEnabled, "Lock blocks actions and keeps unlock/exit available");
+            Click(Command(main,"MenuLock")); Assert(main.CanOpenDialogs, "Sidebar unlock restores actions");
+            // 設定画面の保存で位置やラベルが失われないことを確認します。
+            var settings = new SettingsWindow();
+            var field = typeof(SettingsWindow).GetField("sidebarPosition", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            ((ComboBox)field.GetValue(settings)!).SelectedValue = "Right";
+            typeof(SettingsWindow).GetMethod("Button_Click", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(settings, new object[] { new Button { Name = "SaveButton" }, new RoutedEventArgs() });
+            Assert(services.Settings.SidebarPosition == "Right" && services.Settings.SidebarShowLabels, "Settings saves placement and preserves labels");
+            settings.Close(); Invoke(main,"RefreshData");
+            Click(Command(main,"NavigationButton")); Save(main,"sidebar-icons");
+            main.Left = SystemParameters.WorkArea.Left + 35; main.Top = SystemParameters.WorkArea.Top + 45;
+            double left = main.Left, top = main.Top; main.Close();
+            var saved = Settings.Load(services.SettingsPath);
+            Assert(saved.WindowLeft == left && saved.WindowTop == top, "Closing persists position");
+            services.Settings = saved; var restored = new MainWindow { ShowActivated = false }; restored.Show(); Pump();
+            Assert(Math.Abs(restored.Left-left)<2 && Math.Abs(restored.Top-top)<2, "Restart restores saved position");
+            Assert(DockPanel.GetDock(Named<Border>(restored,"Sidebar")) == Dock.Right && !services.Settings.SidebarShowLabels, "Restart restores sidebar preferences");
+            restored.WindowState = WindowState.Minimized; Pump(); restored.Close();
+            Assert(Settings.Load(services.SettingsPath).WindowLeft == left, "Minimized close saves normal bounds");
+            services.Settings.WindowLeft = -99999; services.Settings.WindowTop = -99999;
+            var recovered = new MainWindow { ShowActivated = false }; recovered.Show(); Pump();
+            Assert(recovered.Left >= SystemParameters.VirtualScreenLeft && recovered.Top >= SystemParameters.VirtualScreenTop, "Off-screen placement is recovered");
+            recovered.Close();
+            Console.WriteLine("PASS total=" + checks); app.Shutdown(); return 0;
+        }
+        catch(Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    sealed class TestWindow : IDisposable
+    {
+        public Window Window { get; }
+        public TestWindow(Window window) { Window = window; window.Show(); Pump(); }
+        public void Dispose() => Window.Close();
+    }
+}
