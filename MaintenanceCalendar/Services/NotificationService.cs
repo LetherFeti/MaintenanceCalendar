@@ -6,6 +6,7 @@ public sealed class NotificationService : IDisposable
 {
     private readonly System.Windows.Forms.NotifyIcon icon;
     private readonly System.Windows.Threading.DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(8) };
+    private readonly System.Windows.Threading.DispatcherTimer eventTimer = new() { Interval = TimeSpan.FromSeconds(15) };
     private readonly Queue<string> messages = new();
     private readonly Window owner;
     private readonly System.Windows.Forms.ContextMenuStrip trayMenu = new();
@@ -36,6 +37,8 @@ public sealed class NotificationService : IDisposable
         icon.BalloonTipClicked += (_, _) => OpenDue();
         icon.DoubleClick += (_, _) => owner.Dispatcher.Invoke(Restore);
         timer.Tick += (_, _) => DisplayNext();
+        eventTimer.Tick += (_, _) => CheckCalendarEvents();
+        eventTimer.Start();
     }
 
     private bool HasOpenDialogs => Application.Current.Windows.Cast<Window>().Any(w => w != owner && w.IsVisible && BelongsToOwner(w));
@@ -89,7 +92,25 @@ public sealed class NotificationService : IDisposable
         LogManager.GetCurrentClassLogger().Info("Startup notifications due={0}", due.Count);
         if (due.Count >= 3) messages.Enqueue($"お手入れが必要なアイテムが複数あります（{due.Count}件）。\nアプリの「通知」で確認してください。");
         else foreach (var item in due) messages.Enqueue("お手入れが必要なアイテムがあります\n" + item.Name);
+        var tomorrow = AppServices.Current.Db.Events(DateTime.Today.AddDays(1), DateTime.Today.AddDays(2), AppServices.Current.Settings.MissingRecurrenceDateBehavior);
+        if (tomorrow.Count > 0)
+        {
+            var lines = tomorrow.Take(3).Select(x => $"{x.Start:HH:mm} {x.Title}").ToList();
+            if (tomorrow.Count > 3) lines.Add($"ほか {tomorrow.Count - 3}件");
+            messages.Enqueue("明日の予定があります\n" + string.Join("\n", lines));
+        }
         DisplayNext(); if (messages.Count > 0) timer.Start();
+    }
+    /// <summary>予定の通知時刻を確認し、既存のWindows通知キューへ追加します。</summary>
+    private void CheckCalendarEvents()
+    {
+        try
+        {
+            foreach (var (entry, timing) in AppServices.Current.Db.TakeEventNotifications(DateTime.Now, AppServices.Current.Settings.MissingRecurrenceDateBehavior))
+                messages.Enqueue($"{timing}の予定: {entry.Title}" + (string.IsNullOrWhiteSpace(entry.Location) ? "" : $"\n{entry.Location}"));
+            if (messages.Count > 0 && !timer.IsEnabled) { DisplayNext(); if (messages.Count > 0) timer.Start(); }
+        }
+        catch (Exception ex) { LogManager.GetCurrentClassLogger().Warn(ex, "Calendar event notification check failed"); }
     }
     /// <summary>
     /// 待機中の通知を1件表示し、残りがなければ通知タイマーを停止します。
@@ -102,5 +123,5 @@ public sealed class NotificationService : IDisposable
     /// <summary>
     /// 通知タイマーを停止し、通知アイコンを非表示にしてリソースを解放します。
     /// </summary>
-    public void Dispose() { owner.StateChanged -= Owner_StateChanged; timer.Stop(); icon.Visible = false; icon.Dispose(); trayMenu.Dispose(); }
+    public void Dispose() { owner.StateChanged -= Owner_StateChanged; timer.Stop(); eventTimer.Stop(); icon.Visible = false; icon.Dispose(); trayMenu.Dispose(); }
 }

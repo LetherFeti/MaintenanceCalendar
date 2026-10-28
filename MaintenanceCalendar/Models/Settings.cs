@@ -17,6 +17,7 @@ public sealed class Settings
     public string SidebarPosition { get; set; } = "Left";
     public bool SidebarShowLabels { get; set; }
     public bool ShowInTaskbar { get; set; } = false;
+    public string MissingRecurrenceDateBehavior { get; set; } = "LastDay";
     public double? WindowLeft { get; set; }
     public double? WindowTop { get; set; }
     public double? WindowWidth { get; set; }
@@ -40,6 +41,7 @@ public sealed class Settings
         }
         if (!new[] { "●", "■", "▼" }.Contains(TodayShape)) throw new InvalidDataException("今日の図形が不正です。");
         if (!new[] { "Left", "Right", "Top", "Bottom" }.Contains(SidebarPosition)) throw new InvalidDataException("サイドバーの位置が不正です。");
+        if (!new[] { "LastDay", "Skip" }.Contains(MissingRecurrenceDateBehavior)) throw new InvalidDataException("定期予定の基準日処理が不正です。");
         foreach (var value in new[] { WindowLeft, WindowTop, WindowWidth, WindowHeight })
             if (value.HasValue && !double.IsFinite(value.Value)) throw new InvalidDataException("ウィンドウ位置が不正です。");
     }

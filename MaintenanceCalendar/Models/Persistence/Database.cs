@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 
 namespace MaintenanceCalendar;
 
@@ -23,9 +24,27 @@ public sealed class Database(string path)
         if (version > 1) throw new InvalidDataException("新しい版のDBです。アプリを更新してください。");
         using var db = CreateContext();
         bool created = db.Database.EnsureCreated();
+        // EnsureCreated does not add tables to databases created by earlier versions.
+        db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS CalendarEvents (Id INTEGER NOT NULL CONSTRAINT PK_CalendarEvents PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL, Start TEXT NOT NULL, End TEXT NOT NULL, Location TEXT NOT NULL DEFAULT '', Description TEXT NOT NULL DEFAULT '', NotifyPreviousDay INTEGER NOT NULL DEFAULT 1, Notify15Minutes INTEGER NOT NULL DEFAULT 1, Notify5Minutes INTEGER NOT NULL DEFAULT 1, Notified TEXT NOT NULL DEFAULT '')");
+        EnsureColumn(db, "Recurrence", "TEXT NOT NULL DEFAULT 'None'");
+        EnsureColumn(db, "RecurrenceEnd", "TEXT NULL");
+        db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS CalendarEventExceptions (EventId INTEGER NOT NULL, OriginalStart TEXT NOT NULL, IsCancelled INTEGER NOT NULL DEFAULT 0, Start TEXT NULL, End TEXT NULL, Title TEXT NULL, Location TEXT NULL, Description TEXT NULL, NotifyPreviousDay INTEGER NULL, Notify15Minutes INTEGER NULL, Notify5Minutes INTEGER NULL, PRIMARY KEY (EventId, OriginalStart), FOREIGN KEY (EventId) REFERENCES CalendarEvents (Id) ON DELETE CASCADE)");
+        db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_CalendarEvents_Start ON CalendarEvents (Start)");
         // Existing version-1 files are used in place, without rebuilding tables.
         if (created || version == 0) SqliteMaintenance.MarkVersion(Path);
         Log.Info("Database initialized (EF Core)");
+    }
+    private static void EnsureColumn(CalendarDbContext db, string column, string definition)
+    {
+        using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = "PRAGMA table_info(CalendarEvents)";
+        if (db.Database.GetDbConnection().State != System.Data.ConnectionState.Open) db.Database.GetDbConnection().Open();
+        using var reader = command.ExecuteReader();
+        while (reader.Read()) if (reader.GetString(1) == column) return;
+        reader.Close();
+        using var alter = db.Database.GetDbConnection().CreateCommand();
+        alter.CommandText = $"ALTER TABLE CalendarEvents ADD COLUMN {column} {definition}";
+        alter.ExecuteNonQuery();
     }
     /// <summary>
     /// 削除済みを含めるか指定して、メーカー・モデル・ID順に所持品を取得します。
@@ -122,6 +141,116 @@ public sealed class Database(string path)
         if (row is null) db.History.Add(new HistoryEntry { Date = date, ItemId = id, Work = work, Memo = memo });
         else row.Memo = memo;
         db.SaveChanges(); tx.Commit(); Log.Info("History saved date={0:yyyy-MM-dd}, item={1}, work={2}", date, id, work);
+    }
+    /// <summary>予定シリーズを開始日時順で取得します。</summary>
+    public List<CalendarEvent> AllEvents()
+    {
+        using var db = CreateContext();
+        return db.CalendarEvents.AsNoTracking().OrderBy(x => x.Start).ToList();
+    }
+    /// <summary>日付範囲に発生する予定を例外情報と繰り返し設定を反映して取得します。</summary>
+    public List<CalendarEvent> Events(DateTime from, DateTime to, string missingDateBehavior = "LastDay")
+    {
+        using var db = CreateContext();
+        var series = db.CalendarEvents.AsNoTracking().ToList();
+        var exceptions = db.CalendarEventExceptions.AsNoTracking().ToList();
+        var seriesById = series.ToDictionary(x => x.Id);
+        var exceptionMap = exceptions.ToDictionary(x => (x.EventId, x.OriginalStart));
+        var results = new Dictionary<(long Id, DateTime Original), CalendarEvent>();
+        foreach (var entry in series)
+        foreach (var start in CalendarRecurrence.Starts(entry, from, to, missingDateBehavior))
+            Add(entry, start);
+        // A moved occurrence may have its original date outside the requested range.
+        foreach (var exception in exceptions.Where(x => x.Start >= from && x.Start < to && seriesById.ContainsKey(x.EventId)))
+        {
+            var entry = seriesById[exception.EventId];
+            var original = CalendarRecurrence.Starts(entry, exception.OriginalStart, exception.OriginalStart.AddTicks(1), missingDateBehavior).FirstOrDefault();
+            if (original == exception.OriginalStart) Add(entry, original);
+        }
+        return results.Values.OrderBy(x => x.Start).ThenBy(x => x.Title).ToList();
+
+        void Add(CalendarEvent entry, DateTime start)
+        {
+            var occurrence = CalendarRecurrence.Occurrence(entry, start);
+            if (exceptionMap.TryGetValue((entry.Id, start), out var exception))
+            {
+                if (exception.IsCancelled) return;
+                occurrence.Start = exception.Start ?? occurrence.Start; occurrence.End = exception.End ?? occurrence.End;
+                occurrence.Title = exception.Title ?? occurrence.Title; occurrence.Location = exception.Location ?? occurrence.Location;
+                occurrence.Description = exception.Description ?? occurrence.Description;
+                occurrence.NotifyPreviousDay = exception.NotifyPreviousDay ?? occurrence.NotifyPreviousDay;
+                occurrence.Notify15Minutes = exception.Notify15Minutes ?? occurrence.Notify15Minutes;
+                occurrence.Notify5Minutes = exception.Notify5Minutes ?? occurrence.Notify5Minutes;
+            }
+            if (occurrence.Start >= from && occurrence.Start < to) results[(entry.Id, start)] = occurrence;
+        }
+    }
+    /// <summary>予定シリーズを追加または更新します。</summary>
+    public void SaveEvent(CalendarEvent entry)
+    {
+        entry.Title = entry.Title.Trim(); entry.Location = entry.Location.Trim(); entry.Description = entry.Description.Trim();
+        ValidateEvent(entry);
+        if (entry.Recurrence is not "None" and not "Weekly" and not "Biweekly" and not "Monthly" and not "Yearly"
+            || entry.RecurrenceEnd.HasValue && entry.RecurrenceEnd.Value.Date < entry.Start.Date)
+            throw new InvalidDataException("予定の内容または日時を確認してください。");
+        using var db = CreateContext();
+        if (entry.Id == 0) db.CalendarEvents.Add(entry);
+        else { db.CalendarEvents.Attach(entry); db.Entry(entry).State = EntityState.Modified; }
+        db.SaveChanges();
+    }
+    /// <summary>指定した開催回だけを変更します。</summary>
+    public void SaveEventOccurrence(CalendarEvent occurrence, CalendarEvent edited)
+    {
+        if (occurrence.OriginalStart is not { } original || !occurrence.IsRecurringOccurrence) { edited.Id = occurrence.Id; SaveEvent(edited); return; }
+        ValidateEvent(edited); using var db = CreateContext();
+        var exception = db.CalendarEventExceptions.Find(occurrence.Id, original) ?? new CalendarEventException { EventId = occurrence.Id, OriginalStart = original };
+        exception.IsCancelled = false; exception.Start = edited.Start; exception.End = edited.End;
+        exception.Title = edited.Title.Trim(); exception.Location = edited.Location.Trim(); exception.Description = edited.Description.Trim();
+        exception.NotifyPreviousDay = edited.NotifyPreviousDay; exception.Notify15Minutes = edited.Notify15Minutes; exception.Notify5Minutes = edited.Notify5Minutes;
+        if (db.Entry(exception).State == EntityState.Detached) db.CalendarEventExceptions.Add(exception);
+        db.SaveChanges();
+    }
+    private static void ValidateEvent(CalendarEvent entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.Title) || entry.Title.Trim().Length > 200 || entry.Location.Length > 300 || entry.Description.Length > 4000
+            || entry.Start.Year is < 1900 or > 9998 || entry.End <= entry.Start)
+            throw new InvalidDataException("予定の内容または日時を確認してください。");
+    }
+    /// <summary>予定シリーズ全体を削除します。</summary>
+    public void DeleteEvent(long id) { using var db = CreateContext(); db.CalendarEvents.Where(x => x.Id == id).ExecuteDelete(); }
+    /// <summary>指定した開催回だけを取り消します。</summary>
+    public void DeleteEventOccurrence(CalendarEvent occurrence)
+    {
+        if (occurrence.OriginalStart is not { } original || !occurrence.IsRecurringOccurrence) { DeleteEvent(occurrence.Id); return; }
+        using var db = CreateContext();
+        var exception = db.CalendarEventExceptions.Find(occurrence.Id, original) ?? new CalendarEventException { EventId = occurrence.Id, OriginalStart = original };
+        exception.IsCancelled = true; exception.Start = exception.End = null; exception.Title = exception.Location = exception.Description = null;
+        exception.NotifyPreviousDay = exception.Notify15Minutes = exception.Notify5Minutes = null;
+        if (db.Entry(exception).State == EntityState.Detached) db.CalendarEventExceptions.Add(exception);
+        db.SaveChanges();
+    }
+    /// <summary>予定通知時刻を確認し、シリーズ単位で重複通知を防ぎます。</summary>
+    public List<(CalendarEvent Event, string Timing)> TakeEventNotifications(DateTime now, string missingDateBehavior = "LastDay")
+    {
+        using var db = CreateContext();
+        var occurrences = Events(now, now.AddDays(1).AddMinutes(1), missingDateBehavior);
+        var masters = db.CalendarEvents.ToDictionary(x => x.Id);
+        var result = new List<(CalendarEvent, string)>();
+        foreach (var entry in occurrences.Where(x => x.End > now))
+        {
+            var checks = new[] { (entry.NotifyPreviousDay, "前日", entry.Start.AddDays(-1)), (entry.Notify15Minutes, "15分前", entry.Start.AddMinutes(-15)), (entry.Notify5Minutes, "5分前", entry.Start.AddMinutes(-5)) };
+            foreach (var (enabled, key, at) in checks)
+            {
+                string occurrenceKey = entry.OriginalStart?.ToString("O", CultureInfo.InvariantCulture) ?? entry.Start.ToString("O", CultureInfo.InvariantCulture);
+                string marker = $"{key}:{occurrenceKey}";
+                var master = masters[entry.Id];
+                if (enabled && now >= at && now < at.AddMinutes(1) && !master.Notified.Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(marker))
+                {
+                    result.Add((entry, key)); master.Notified = string.IsNullOrEmpty(master.Notified) ? marker : master.Notified + "|" + marker;
+                }
+            }
+        }
+        if (result.Count > 0) db.SaveChanges(); return result;
     }
     /// <summary>
     /// 未登録の所持品だけを一括登録し、登録済みの記録とメモは変更しません。
@@ -240,6 +369,13 @@ public sealed class Database(string path)
         // Stream through the date converter to reject malformed dates without raw queries.
         foreach (var row in db.History.AsNoTracking().AsEnumerable())
             if (row.Work is not 1 and not 2 || row.Date.Year is < 1900 or > 9998) throw new InvalidDataException("履歴データが不正です。");
+        foreach (var entry in db.CalendarEvents.AsNoTracking())
+        {
+            ValidateEvent(entry);
+            if (entry.Recurrence is not "None" and not "Weekly" and not "Biweekly" and not "Monthly" and not "Yearly"
+                || entry.RecurrenceEnd.HasValue && entry.RecurrenceEnd.Value.Date < entry.Start.Date)
+                throw new InvalidDataException("予定の繰り返し設定が不正です。");
+        }
     }
     /// <summary>
     /// 購入日または登録日の基準日と登録日が対応年の範囲内にあることを確認します。

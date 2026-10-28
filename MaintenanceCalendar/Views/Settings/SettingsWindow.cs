@@ -6,6 +6,8 @@ public sealed class SettingsWindow : ToolWindow
 {
     private readonly Dictionary<string, TextBox> colors = [];
     private readonly ComboBox shape = new() { ItemsSource = new[] { "●", "■", "▼" } };
+    private readonly ComboBox missingRecurrenceDate = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key",
+        ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" } };
     private readonly CheckBox showInTaskbar = new() { Content = "Alt＋Tab に表示する" };
     private readonly ComboBox sidebarPosition = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key",
         ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" } };
@@ -41,8 +43,11 @@ public sealed class SettingsWindow : ToolWindow
         Ui.Field(panel, "サイドバーの表示位置", sidebarPosition);
         showInTaskbar.IsChecked = settings.ShowInTaskbar;
         Ui.Field(panel, "ウィンドウ", showInTaskbar);
+        missingRecurrenceDate.SelectedValue = settings.MissingRecurrenceDateBehavior;
+        panel.Children.Add(Ui.Text("毎月・毎年の予定で基準日がない場合", 14));
+        Ui.Field(panel, "例：毎月31日、2月29日", missingRecurrenceDate);
 
-        Actions.Children.Add(Ui.Button("SaveButton", "表示設定を保存", Button_Click));
+        Actions.Children.Add(Ui.Button("SaveButton", "設定を保存", Button_Click));
         Actions.Children.Add(Ui.Button("HolidayButton", "祝日取得", Button_Click));
         Actions.Children.Add(Ui.Button("CloseButton", "閉じる", Button_Click));
         Actions.Children.Add(holidayStatus);
@@ -73,6 +78,7 @@ public sealed class SettingsWindow : ToolWindow
         foreach (var field in colors.Values) field.TextChanged += (_, _) => UpdateDirtyStatus();
         shape.SelectionChanged += (_, _) => UpdateDirtyStatus();
         sidebarPosition.SelectionChanged += (_, _) => UpdateDirtyStatus();
+        missingRecurrenceDate.SelectionChanged += (_, _) => UpdateDirtyStatus();
         showInTaskbar.Checked += (_, _) => UpdateDirtyStatus();
         showInTaskbar.Unchecked += (_, _) => UpdateDirtyStatus();
     }
@@ -83,7 +89,8 @@ public sealed class SettingsWindow : ToolWindow
         return colors["Theme"].Text.Trim() != current.ThemeColor || colors["Background"].Text.Trim() != current.BackgroundColor
             || colors["Today"].Text.Trim() != current.TodayColor || colors["Use"].Text.Trim() != current.UseColor
             || colors["Care"].Text.Trim() != current.CareColor || (string?)shape.SelectedItem != current.TodayShape
-            || (string?)sidebarPosition.SelectedValue != current.SidebarPosition || showInTaskbar.IsChecked != current.ShowInTaskbar;
+            || (string?)sidebarPosition.SelectedValue != current.SidebarPosition || showInTaskbar.IsChecked != current.ShowInTaskbar
+            || (string?)missingRecurrenceDate.SelectedValue != current.MissingRecurrenceDateBehavior;
     }
 
     private void UpdateDirtyStatus() => operationStatus.Text = HasUnsavedChanges() ? "未保存の設定があります。" : string.Empty;
@@ -113,6 +120,7 @@ public sealed class SettingsWindow : ToolWindow
                     var s = new Settings { ThemeColor = colors["Theme"].Text.Trim(), BackgroundColor = colors["Background"].Text.Trim(), TodayColor = colors["Today"].Text.Trim(), UseColor = colors["Use"].Text.Trim(), CareColor = colors["Care"].Text.Trim(), TodayShape = (string)shape.SelectedItem,
                         SidebarPosition = (string)sidebarPosition.SelectedValue, SidebarShowLabels = Services.Settings.SidebarShowLabels,
                         ShowInTaskbar = showInTaskbar.IsChecked == true,
+                        MissingRecurrenceDateBehavior = (string)missingRecurrenceDate.SelectedValue,
                         WindowLeft = Services.Settings.WindowLeft, WindowTop = Services.Settings.WindowTop,
                         WindowWidth = Services.Settings.WindowWidth, WindowHeight = Services.Settings.WindowHeight,
                         HolidayFetchedAt = Services.Settings.HolidayFetchedAt };

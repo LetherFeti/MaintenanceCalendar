@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private Dictionary<DateTime, string> holidays = [];
     private bool locked;
     private int dueCount;
+    private int todayEventCount;
     private NotificationService? notifications;
     private readonly System.Windows.Threading.DispatcherTimer midnight = new() { Interval = TimeSpan.FromMinutes(1) };
     private DateTime displayedToday = DateTime.Today;
@@ -89,7 +90,11 @@ public partial class MainWindow : Window
     /// <summary>
     /// 今日までに手入れ期限へ達した所持品の件数を更新します。
     /// </summary>
-    private void RefreshDueCount() => dueCount = Services.Db.Due(DateTime.Today).Count;
+    private void RefreshDueCount()
+    {
+        dueCount = Services.Db.Due(DateTime.Today).Count;
+        todayEventCount = Services.Db.Events(DateTime.Today, DateTime.Today.AddDays(1), Services.Settings.MissingRecurrenceDateBehavior).Count;
+    }
     /// <summary>
     /// 表示月の記録・祝日・設定色と図形から、日曜始まり6週のカレンダーを描画します。
     /// </summary>
@@ -100,6 +105,7 @@ public partial class MainWindow : Window
         SetLegend(UseLegend, "●", "使用", settings.UseColor);
         SetLegend(CareLegend, "●", "お手入れ", settings.CareColor);
         var marks = Services.Db.Month(month, SelectedId).ToLookup(x => x.Date);
+        var events = Services.Db.Events(month.Date, month.AddMonths(1).Date, Services.Settings.MissingRecurrenceDateBehavior).ToLookup(x => x.Start.Date);
         var itemNames = items.ToDictionary(x => x.Id, x => x.DisplayName);
         DaysPanel.Children.Clear(); DateTime first = month.AddDays(-(int)month.DayOfWeek);
         for (int n = 0; n < 42; n++)
@@ -115,6 +121,7 @@ public partial class MainWindow : Window
             }
             if (use || care) visual.Children.Add(new Ellipse { Fill = Settings.Brush(use ? settings.UseColor : settings.CareColor), Margin = new Thickness(5) });
             if (care && use) visual.Children.Add(new Ellipse { Stroke = Settings.Brush(settings.CareColor), StrokeThickness = 3, Margin = new Thickness(3) });
+            if (events[date].Any()) visual.Children.Add(new Ellipse { Stroke = Settings.Brush(settings.ThemeColor), StrokeThickness = 2, Margin = new Thickness(1) });
             bool holiday = holidays.TryGetValue(date, out var holidayName);
             var number = new TextBlock { Text = date.Day.ToString(), FontSize = 22, FontFamily = new FontFamily("Segoe UI, Yu Gothic UI"),
                 VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
@@ -129,10 +136,11 @@ public partial class MainWindow : Window
             if (holiday) details.Add(holidayName!);
             foreach (var item in dayRecords.GroupBy(x => x.ItemId).OrderBy(x => itemNames[x.Key]))
                 details.Add($"{string.Join("・", item.OrderBy(x => x.Work).Select(x => x.Work == 1 ? "使用" : "お手入れ"))} : {itemNames[item.Key]}");
+            foreach (var entry in events[date]) details.Add($"予定: {entry.Start:HH:mm} {entry.Title}");
             button.ToolTip = details.Count == 0 ? null : string.Join("\n", details);
             DaysPanel.Children.Add(button);
         }
-        DueButton.Content = $"通知  {dueCount}件";
+        DueButton.Content = $"通知  {dueCount + todayEventCount}件";
         UiMotion.FadeIn(DaysPanel);
     }
     /// <summary>
@@ -154,6 +162,7 @@ public partial class MainWindow : Window
                 case "MenuTemplates": Ui.Show(this, new TemplatesWindow()); RefreshData(); break;
                 case "DashboardButton": case "MenuDashboard": Ui.Show(this, new DashboardWindow()); break;
                 case "HistoryButton": case "MenuHistory": Ui.Show(this, new HistoryWindow(SelectedId)); break;
+                case "MenuCalendarEvents": Ui.Show(this, new CalendarEventsWindow()); RefreshDueCount(); RenderCalendar(); break;
                 case "SettingsButton": case "MenuSettings": Ui.Show(this, new SettingsWindow()); RefreshData(); break;
                 case "DueButton": Ui.Show(this, new DueWindow()); break;
                 case "MenuLock":
@@ -208,6 +217,7 @@ public partial class MainWindow : Window
         Add("MenuItems", "Items", "所持品マスタ", Button_Click);
         Add("MenuTemplates", "Care", "お手入れマスタ", Button_Click);
         Add("MenuHistory", "History", "手入れ・使用履歴", Button_Click);
+        Add("MenuCalendarEvents", "Calendar", "予定一覧", Button_Click);
         Add("MenuDashboard", "Dashboard", "ダッシュボード", Button_Click);
         Add("MenuSettings", "Settings", "設定", Button_Click);
         Add("MenuLock", "Lock", locked ? "誤クリック予防を解除" : "誤クリック予防", Button_Click);

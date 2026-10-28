@@ -13,6 +13,8 @@ public sealed class CalendarDbContext(string path) : DbContext
     public DbSet<HistoryEntry> History => Set<HistoryEntry>();
     public DbSet<CareTemplate> CareTemplates => Set<CareTemplate>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
+    public DbSet<CalendarEventException> CalendarEventExceptions => Set<CalendarEventException>();
     /// <summary>
     /// DBファイル・外部キー検査・タイムアウトを指定してSQLite接続を構成します。
     /// </summary>
@@ -49,5 +51,26 @@ public sealed class CalendarDbContext(string path) : DbContext
         template.HasKey(x => x.Summary); template.Property(x => x.IsDeleted).HasDefaultValue(false);
         var holiday = model.Entity<Holiday>();
         holiday.ToTable("Holidays"); holiday.HasKey(x => x.Date); holiday.Property(x => x.Date).HasConversion(date);
+        var calendarEvent = model.Entity<CalendarEvent>();
+        calendarEvent.ToTable("CalendarEvents"); calendarEvent.HasKey(x => x.Id);
+        calendarEvent.Property(x => x.Id).ValueGeneratedOnAdd();
+        calendarEvent.Property(x => x.Title).HasMaxLength(200).IsRequired();
+        calendarEvent.Property(x => x.Location).HasMaxLength(300).HasDefaultValue("");
+        calendarEvent.Property(x => x.Description).HasMaxLength(4000).HasDefaultValue("");
+        calendarEvent.Property(x => x.Notified).HasDefaultValue(""); calendarEvent.HasIndex(x => x.Start);
+        calendarEvent.Property(x => x.Recurrence).HasDefaultValue("None");
+        calendarEvent.Property(x => x.RecurrenceEnd).HasConversion(date);
+        calendarEvent.Ignore(x => x.OriginalStart); calendarEvent.Ignore(x => x.SeriesStart);
+        calendarEvent.Ignore(x => x.IsRecurringOccurrence); calendarEvent.Ignore(x => x.RecurrenceLabel);
+        var exception = model.Entity<CalendarEventException>();
+        exception.ToTable("CalendarEventExceptions"); exception.HasKey(x => new { x.EventId, x.OriginalStart });
+        exception.Property(x => x.OriginalStart).HasConversion(new ValueConverter<DateTime, string>(
+            v => v.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture),
+            v => DateTime.ParseExact(v, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)));
+        exception.Property(x => x.Start).HasConversion(new ValueConverter<DateTime?, string?>(v => v.HasValue ? v.Value.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture) : null,
+            v => v == null ? null : DateTime.ParseExact(v, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)));
+        exception.Property(x => x.End).HasConversion(new ValueConverter<DateTime?, string?>(v => v.HasValue ? v.Value.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture) : null,
+            v => v == null ? null : DateTime.ParseExact(v, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)));
+        exception.HasOne<CalendarEvent>().WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
     }
 }
