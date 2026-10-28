@@ -61,7 +61,7 @@ public sealed class CalendarDbContext(string path) : DbContext
         calendarEvent.Property(x => x.Recurrence).HasDefaultValue("None");
         calendarEvent.Property(x => x.RecurrenceEnd).HasConversion(date);
         calendarEvent.Ignore(x => x.OriginalStart); calendarEvent.Ignore(x => x.SeriesStart);
-        calendarEvent.Ignore(x => x.IsRecurringOccurrence); calendarEvent.Ignore(x => x.RecurrenceLabel);
+        calendarEvent.Ignore(x => x.IsRecurringOccurrence); calendarEvent.Ignore(x => x.RecurrenceLabel); calendarEvent.Ignore(x => x.NotificationsSuppressed); calendarEvent.Ignore(x => x.NotificationMask);
         var exception = model.Entity<CalendarEventException>();
         exception.ToTable("CalendarEventExceptions"); exception.HasKey(x => new { x.EventId, x.OriginalStart });
         exception.Property(x => x.OriginalStart).HasConversion(new ValueConverter<DateTime, string>(
@@ -72,5 +72,6 @@ public sealed class CalendarDbContext(string path) : DbContext
         exception.Property(x => x.End).HasConversion(new ValueConverter<DateTime?, string?>(v => v.HasValue ? v.Value.ToString("yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture) : null,
             v => v == null ? null : DateTime.ParseExact(v, "yyyy-MM-dd HH:mm:ss.fffffff", CultureInfo.InvariantCulture)));
         exception.HasOne<CalendarEvent>().WithMany().HasForeignKey(x => x.EventId).OnDelete(DeleteBehavior.Cascade);
+        exception.Property(x => x.SuppressNotifications).HasDefaultValue(false); exception.Property(x => x.NotifiedMask).HasDefaultValue(0);
     }
 }

@@ -69,7 +69,7 @@ public static class CalendarRecurrence
         Location = series.Location, Description = series.Description,
         NotifyPreviousDay = series.NotifyPreviousDay, Notify15Minutes = series.Notify15Minutes, Notify5Minutes = series.Notify5Minutes,
         Notified = series.Notified, Recurrence = series.Recurrence, RecurrenceEnd = series.RecurrenceEnd,
-        OriginalStart = series.Recurrence == "None" ? null : start, SeriesStart = series.Start,
+        OriginalStart = start, SeriesStart = series.Start,
         IsRecurringOccurrence = series.Recurrence != "None"
     };
 }

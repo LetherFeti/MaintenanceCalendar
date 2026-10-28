@@ -28,7 +28,10 @@ public sealed class Database(string path)
         db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS CalendarEvents (Id INTEGER NOT NULL CONSTRAINT PK_CalendarEvents PRIMARY KEY AUTOINCREMENT, Title TEXT NOT NULL, Start TEXT NOT NULL, End TEXT NOT NULL, Location TEXT NOT NULL DEFAULT '', Description TEXT NOT NULL DEFAULT '', NotifyPreviousDay INTEGER NOT NULL DEFAULT 1, Notify15Minutes INTEGER NOT NULL DEFAULT 1, Notify5Minutes INTEGER NOT NULL DEFAULT 1, Notified TEXT NOT NULL DEFAULT '')");
         EnsureColumn(db, "Recurrence", "TEXT NOT NULL DEFAULT 'None'");
         EnsureColumn(db, "RecurrenceEnd", "TEXT NULL");
-        db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS CalendarEventExceptions (EventId INTEGER NOT NULL, OriginalStart TEXT NOT NULL, IsCancelled INTEGER NOT NULL DEFAULT 0, Start TEXT NULL, End TEXT NULL, Title TEXT NULL, Location TEXT NULL, Description TEXT NULL, NotifyPreviousDay INTEGER NULL, Notify15Minutes INTEGER NULL, Notify5Minutes INTEGER NULL, PRIMARY KEY (EventId, OriginalStart), FOREIGN KEY (EventId) REFERENCES CalendarEvents (Id) ON DELETE CASCADE)");
+        db.Database.ExecuteSqlRaw("CREATE TABLE IF NOT EXISTS CalendarEventExceptions (EventId INTEGER NOT NULL, OriginalStart TEXT NOT NULL, IsCancelled INTEGER NOT NULL DEFAULT 0, Start TEXT NULL, End TEXT NULL, Title TEXT NULL, Location TEXT NULL, Description TEXT NULL, NotifyPreviousDay INTEGER NULL, Notify15Minutes INTEGER NULL, Notify5Minutes INTEGER NULL, SuppressNotifications INTEGER NOT NULL DEFAULT 0, NotifiedMask INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (EventId, OriginalStart), FOREIGN KEY (EventId) REFERENCES CalendarEvents (Id) ON DELETE CASCADE)");
+        EnsureExceptionColumn(db, "SuppressNotifications", "INTEGER NOT NULL DEFAULT 0");
+        EnsureExceptionColumn(db, "NotifiedMask", "INTEGER NOT NULL DEFAULT 0");
+        MigrateLegacyReminderMarkers(db);
         db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_CalendarEvents_Start ON CalendarEvents (Start)");
         // Existing version-1 files are used in place, without rebuilding tables.
         if (created || version == 0) SqliteMaintenance.MarkVersion(Path);
@@ -45,6 +48,33 @@ public sealed class Database(string path)
         using var alter = db.Database.GetDbConnection().CreateCommand();
         alter.CommandText = $"ALTER TABLE CalendarEvents ADD COLUMN {column} {definition}";
         alter.ExecuteNonQuery();
+    }
+    private static void EnsureExceptionColumn(CalendarDbContext db, string column, string definition)
+    {
+        var connection = db.Database.GetDbConnection();
+        using var command = connection.CreateCommand(); command.CommandText = "PRAGMA table_info(CalendarEventExceptions)";
+        if (connection.State != System.Data.ConnectionState.Open) connection.Open();
+        using var reader = command.ExecuteReader(); while (reader.Read()) if (reader.GetString(1) == column) return;
+        reader.Close(); using var alter = connection.CreateCommand(); alter.CommandText = $"ALTER TABLE CalendarEventExceptions ADD COLUMN {column} {definition}"; alter.ExecuteNonQuery();
+    }
+    private static void MigrateLegacyReminderMarkers(CalendarDbContext db)
+    {
+        var events = db.CalendarEvents.Where(x => x.Notified != "").ToList();
+        foreach (var entry in events)
+        {
+            foreach (string marker in entry.Notified.Split('|', StringSplitOptions.RemoveEmptyEntries))
+            {
+                int separator = marker.IndexOf(':');
+                if (separator <= 0 || !DateTime.TryParse(marker[(separator + 1)..], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var start)) continue;
+                int bit = marker[..separator] switch { "前日" => 1, "15分前" => 2, "5分前" => 4, _ => 0 };
+                if (bit == 0) continue;
+                var state = db.CalendarEventExceptions.Find(entry.Id, start) ?? new CalendarEventException { EventId = entry.Id, OriginalStart = start };
+                state.NotifiedMask |= bit;
+                if (db.Entry(state).State == EntityState.Detached) db.CalendarEventExceptions.Add(state);
+            }
+            entry.Notified = "";
+        }
+        if (events.Count > 0) db.SaveChanges();
     }
     /// <summary>
     /// 削除済みを含めるか指定して、メーカー・モデル・ID順に所持品を取得します。
@@ -181,6 +211,8 @@ public sealed class Database(string path)
                 occurrence.NotifyPreviousDay = exception.NotifyPreviousDay ?? occurrence.NotifyPreviousDay;
                 occurrence.Notify15Minutes = exception.Notify15Minutes ?? occurrence.Notify15Minutes;
                 occurrence.Notify5Minutes = exception.Notify5Minutes ?? occurrence.Notify5Minutes;
+                occurrence.NotificationsSuppressed = exception.SuppressNotifications;
+                occurrence.NotificationMask = exception.NotifiedMask;
             }
             if (occurrence.Start >= from && occurrence.Start < to) results[(entry.Id, start)] = occurrence;
         }
@@ -195,7 +227,13 @@ public sealed class Database(string path)
             throw new InvalidDataException("予定の内容または日時を確認してください。");
         using var db = CreateContext();
         if (entry.Id == 0) db.CalendarEvents.Add(entry);
-        else { db.CalendarEvents.Attach(entry); db.Entry(entry).State = EntityState.Modified; }
+        else
+        {
+            // A non-recurring event has exactly one occurrence. If a series was
+            // converted to a one-off event, its old occurrence state is obsolete.
+            if (entry.Recurrence == "None") db.CalendarEventExceptions.Where(x => x.EventId == entry.Id).ExecuteDelete();
+            db.CalendarEvents.Attach(entry); db.Entry(entry).State = EntityState.Modified;
+        }
         db.SaveChanges();
     }
     /// <summary>指定した開催回だけを変更します。</summary>
@@ -207,6 +245,7 @@ public sealed class Database(string path)
         exception.IsCancelled = false; exception.Start = edited.Start; exception.End = edited.End;
         exception.Title = edited.Title.Trim(); exception.Location = edited.Location.Trim(); exception.Description = edited.Description.Trim();
         exception.NotifyPreviousDay = edited.NotifyPreviousDay; exception.Notify15Minutes = edited.Notify15Minutes; exception.Notify5Minutes = edited.Notify5Minutes;
+        exception.SuppressNotifications = false; exception.NotifiedMask = 0;
         if (db.Entry(exception).State == EntityState.Detached) db.CalendarEventExceptions.Add(exception);
         db.SaveChanges();
     }
@@ -229,28 +268,57 @@ public sealed class Database(string path)
         if (db.Entry(exception).State == EntityState.Detached) db.CalendarEventExceptions.Add(exception);
         db.SaveChanges();
     }
-    /// <summary>予定通知時刻を確認し、シリーズ単位で重複通知を防ぎます。</summary>
-    public List<(CalendarEvent Event, string Timing)> TakeEventNotifications(DateTime now, string missingDateBehavior = "LastDay")
+    /// <summary>未表示の通知タイミングを開催回単位でまとめ、最新の該当タイミングを返します。</summary>
+    public List<EventReminderCandidate> EventNotificationsDue(DateTime now, string missingDateBehavior = "LastDay")
+    {
+        var occurrences = Events(now, now.AddDays(1).AddMinutes(1), missingDateBehavior);
+        var result = new List<EventReminderCandidate>();
+        foreach (var entry in occurrences.Where(x => x.End > now && x.Start > now && !x.NotificationsSuppressed))
+        {
+            int mask = entry.NotificationMask;
+            var checks = new[] { (entry.NotifyPreviousDay, "前日", entry.Start.AddDays(-1), 1), (entry.Notify15Minutes, "15分前", entry.Start.AddMinutes(-15), 2), (entry.Notify5Minutes, "5分前", entry.Start.AddMinutes(-5), 4) };
+            var due = checks.Where(x => x.Item1 && now >= x.Item3 && (mask & x.Item4) == 0).ToList();
+            if (due.Count > 0) result.Add(new EventReminderCandidate(entry, due.OrderBy(x => x.Item3).Last().Item2, due.Aggregate(0, (value, x) => value | x.Item4)));
+        }
+        return result;
+    }
+    /// <summary>開催回の通知を表示した記録を保存します。</summary>
+    public void MarkEventReminderDisplayed(CalendarEvent occurrence, int mask)
+    {
+        var original = occurrence.OriginalStart ?? occurrence.Start;
+        using var db = CreateContext();
+        var state = db.CalendarEventExceptions.Find(occurrence.Id, original) ?? new CalendarEventException { EventId = occurrence.Id, OriginalStart = original };
+        if (state.SuppressNotifications) return;
+        state.NotifiedMask |= mask;
+        if (db.Entry(state).State == EntityState.Detached) db.CalendarEventExceptions.Add(state);
+        db.SaveChanges();
+    }
+    /// <summary>この開催回の残りの通知を止めます。</summary>
+    public void SuppressEventOccurrenceNotifications(CalendarEvent occurrence)
+    {
+        var original = occurrence.OriginalStart ?? occurrence.Start;
+        using var db = CreateContext();
+        var state = db.CalendarEventExceptions.Find(occurrence.Id, original) ?? new CalendarEventException { EventId = occurrence.Id, OriginalStart = original };
+        state.SuppressNotifications = true;
+        if (db.Entry(state).State == EntityState.Detached) db.CalendarEventExceptions.Add(state);
+        db.SaveChanges();
+    }
+    /// <summary>終了済み開催回の例外・通知抑止記録を削除して保存領域を抑えます。</summary>
+    public void PruneExpiredEventState(DateTime now)
     {
         using var db = CreateContext();
-        var occurrences = Events(now, now.AddDays(1).AddMinutes(1), missingDateBehavior);
-        var masters = db.CalendarEvents.ToDictionary(x => x.Id);
-        var result = new List<(CalendarEvent, string)>();
-        foreach (var entry in occurrences.Where(x => x.End > now))
+        var masters = db.CalendarEvents.AsNoTracking().ToDictionary(x => x.Id);
+        var expired = new List<CalendarEventException>();
+        foreach (var exception in db.CalendarEventExceptions.ToList())
         {
-            var checks = new[] { (entry.NotifyPreviousDay, "前日", entry.Start.AddDays(-1)), (entry.Notify15Minutes, "15分前", entry.Start.AddMinutes(-15)), (entry.Notify5Minutes, "5分前", entry.Start.AddMinutes(-5)) };
-            foreach (var (enabled, key, at) in checks)
-            {
-                string occurrenceKey = entry.OriginalStart?.ToString("O", CultureInfo.InvariantCulture) ?? entry.Start.ToString("O", CultureInfo.InvariantCulture);
-                string marker = $"{key}:{occurrenceKey}";
-                var master = masters[entry.Id];
-                if (enabled && now >= at && now < at.AddMinutes(1) && !master.Notified.Split('|', StringSplitOptions.RemoveEmptyEntries).Contains(marker))
-                {
-                    result.Add((entry, key)); master.Notified = string.IsNullOrEmpty(master.Notified) ? marker : master.Notified + "|" + marker;
-                }
-            }
+            if (!masters.TryGetValue(exception.EventId, out var series)) { expired.Add(exception); continue; }
+            DateTime end = exception.IsCancelled
+                ? exception.OriginalStart + (series.End - series.Start)
+                : exception.End ?? (exception.Start ?? exception.OriginalStart) + (series.End - series.Start);
+            if (end < now) expired.Add(exception);
         }
-        if (result.Count > 0) db.SaveChanges(); return result;
+        if (expired.Count == 0) return;
+        db.CalendarEventExceptions.RemoveRange(expired); db.SaveChanges();
     }
     /// <summary>
     /// 未登録の所持品だけを一括登録し、登録済みの記録とメモは変更しません。
