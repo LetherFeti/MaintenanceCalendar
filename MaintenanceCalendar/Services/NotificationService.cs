@@ -101,10 +101,23 @@ public sealed class NotificationService : IDisposable
         LogManager.GetCurrentClassLogger().Info("Startup notifications due={0}", due.Count);
         if (due.Count >= 3) messages.Enqueue($"お手入れが必要なアイテムが複数あります（{due.Count}件）。\nアプリの「通知」で確認してください。");
         else foreach (var item in due) messages.Enqueue("お手入れが必要なアイテムがあります\n" + item.Name);
-        var tomorrow = AppServices.Current.Db.Events(DateTime.Today.AddDays(1), DateTime.Today.AddDays(2), AppServices.Current.Settings.MissingRecurrenceDateBehavior);
-        foreach (var entry in tomorrow.Where(x => !x.NotificationsSuppressed)) EnqueueEvent(new(entry, "明日の予定", "", 0, true));
+        EnqueueTomorrowEvents();
         DisplayNext(); if (messages.Count > 0) timer.Start();
         CheckCalendarEvents();
+    }
+    /// <summary>日付が変わったときに翌日分の予定を追加して、通知を再確認します。</summary>
+    public void OnDateChanged()
+    {
+        PruneExpiredEventState();
+        EnqueueTomorrowEvents();
+        ShowNextEventWindow();
+        CheckCalendarEvents();
+    }
+
+    private void EnqueueTomorrowEvents()
+    {
+        var tomorrow = AppServices.Current.Db.Events(DateTime.Today.AddDays(1), DateTime.Today.AddDays(2), AppServices.Current.Settings.MissingRecurrenceDateBehavior);
+        foreach (var entry in tomorrow.Where(x => !x.NotificationsSuppressed)) EnqueueEvent(new(entry, "明日の予定", "", 0, true));
     }
     /// <summary>通知可能な状態なら、予定の通知時刻を確認して独立ウィンドウを表示します。</summary>
     private void CheckCalendarEvents()

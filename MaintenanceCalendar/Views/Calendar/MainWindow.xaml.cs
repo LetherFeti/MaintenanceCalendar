@@ -65,7 +65,21 @@ public partial class MainWindow : Window
         Loaded += (_, _) => Ui.Run(() => { RefreshData(); notifications = new NotificationService(this); notifications.ShowDue(); });
         Closed += (_, _) => { midnight.Stop(); notifications?.Dispose(); };
         Closing += (_, _) => Ui.Run(SavePlacement);
-        midnight.Tick += (_, _) => { if (IsEnabled && DateTime.Today != displayedToday) { displayedToday = DateTime.Today; Ui.Run(() => { RefreshDueCount(); RenderCalendar(); }); } };
+        midnight.Tick += (_, _) =>
+        {
+            DateTime today = DateTime.Today;
+            if (today == displayedToday) return;
+            DateTime previousToday = displayedToday;
+            displayedToday = today;
+            Ui.Run(() =>
+            {
+                if (month.Year == previousToday.Year && month.Month == previousToday.Month)
+                    month = new DateTime(today.Year, today.Month, 1);
+                RefreshDueCount();
+                RenderCalendar();
+                notifications?.OnDateChanged();
+            });
+        };
         midnight.Start();
     }
     /// <summary>
