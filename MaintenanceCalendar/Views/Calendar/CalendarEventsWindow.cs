@@ -99,10 +99,21 @@ public sealed class CalendarEventEditWindow : ToolWindow
                 throw new InvalidDataException("タイトル・日付・時刻を確認してください。");
             var starts = date.SelectedDate.Value.Date + start; var ends = date.SelectedDate.Value.Date + end;
             if (ends <= starts) ends = ends.AddDays(1);
-            Result = new CalendarEvent { Id = ((CalendarEvent)Tag!).Id, Title = title.Text, Start = starts, End = ends, Location = location.Text, Description = description.Text,
-                Recurrence = recurrence.SelectedValue as string ?? "None", RecurrenceEnd = recurrenceEnd.SelectedDate?.Date,
-                NotifyPreviousDay = previous.IsChecked == true, Notify15Minutes = fifteen.IsChecked == true, Notify5Minutes = five.IsChecked == true,
-                Notified = ((CalendarEvent)Tag!).Notified };
+            Result = new CalendarEvent
+            {
+                Id = ((CalendarEvent)Tag!).Id,
+                Title = title.Text,
+                Start = starts,
+                End = ends,
+                Location = location.Text,
+                Description = description.Text,
+                Recurrence = recurrence.SelectedValue as string ?? "None",
+                RecurrenceEnd = recurrenceEnd.SelectedDate?.Date,
+                NotifyPreviousDay = previous.IsChecked == true,
+                Notify15Minutes = fifteen.IsChecked == true,
+                Notify5Minutes = five.IsChecked == true,
+                Notified = ((CalendarEvent)Tag!).Notified
+            };
             DialogResult = true;
         });
     }

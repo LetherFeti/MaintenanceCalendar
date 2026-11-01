@@ -22,7 +22,11 @@ public sealed class CalendarEvent
     public int NotificationMask { get; set; }
     public string RecurrenceLabel => Recurrence switch
     {
-        "Weekly" => "毎週", "Biweekly" => "隔週", "Monthly" => "毎月", "Yearly" => "毎年", _ => "繰り返しなし"
+        "Weekly" => "毎週",
+        "Biweekly" => "隔週",
+        "Monthly" => "毎月",
+        "Yearly" => "毎年",
+        _ => "繰り返しなし"
     };
 }
 

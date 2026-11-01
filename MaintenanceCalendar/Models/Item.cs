@@ -22,6 +22,14 @@ public sealed class Item
     /// <summary>
     /// ID・登録日・削除状態を引き継がず、所持品の入力内容と写真を複製します。
     /// </summary>
-    public Item Copy() => new() { Manufacturer = Manufacturer, Model = Model, Color = Color,
-        PurchaseDate = PurchaseDate, IntervalKey = IntervalKey, Memo = Memo, Photo = Photo };
+    public Item Copy() => new()
+    {
+        Manufacturer = Manufacturer,
+        Model = Model,
+        Color = Color,
+        PurchaseDate = PurchaseDate,
+        IntervalKey = IntervalKey,
+        Memo = Memo,
+        Photo = Photo
+    };
 }

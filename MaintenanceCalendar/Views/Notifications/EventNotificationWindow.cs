@@ -15,8 +15,15 @@ public sealed class EventNotificationWindow : Window
         ShowActivated = false; Topmost = true; WindowStartupLocation = WindowStartupLocation.Manual;
         Cursor = System.Windows.Input.Cursors.Arrow;
 
-        var card = new Border { CornerRadius = new CornerRadius(16), Padding = new Thickness(20), Margin = new Thickness(12),
-            Background = (Brush)Application.Current.FindResource("CreamBrush"), BorderBrush = (Brush)Application.Current.FindResource("AccentBrush"), BorderThickness = new Thickness(2) };
+        var card = new Border
+        {
+            CornerRadius = new CornerRadius(16),
+            Padding = new Thickness(20),
+            Margin = new Thickness(12),
+            Background = (Brush)Application.Current.FindResource("CreamBrush"),
+            BorderBrush = (Brush)Application.Current.FindResource("AccentBrush"),
+            BorderThickness = new Thickness(2)
+        };
         var content = new StackPanel(); card.Child = content;
         var title = Ui.Text(heading, 13); title.Foreground = (Brush)FindResource("AccentBrush"); title.FontWeight = FontWeights.SemiBold; content.Children.Add(title);
         var eventTitle = Ui.Text(entry.Title, 20); eventTitle.FontWeight = FontWeights.Bold; content.Children.Add(eventTitle);

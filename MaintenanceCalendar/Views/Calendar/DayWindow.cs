@@ -282,9 +282,21 @@ public sealed class DayWindow : ToolWindow
             throw new InvalidDataException("日付と時刻を確認してください。");
         var start = eventDate.SelectedDate.Value.Date + startTime; var end = eventDate.SelectedDate.Value.Date + endTime;
         if (end <= start) end = end.AddDays(1);
-        var edited = new CalendarEvent { Id = selectedEvent?.Id ?? 0, Title = eventTitle.Text, Start = start, End = end, Location = eventLocation.Text, Description = eventDescription.Text,
-            NotifyPreviousDay = notifyPrevious.IsChecked == true, Notify15Minutes = notify15.IsChecked == true, Notify5Minutes = notify5.IsChecked == true,
-            Notified = selectedEvent?.Notified ?? "", Recurrence = recurrence.SelectedValue as string ?? "None", RecurrenceEnd = recurrenceEnd.SelectedDate?.Date };
+        var edited = new CalendarEvent
+        {
+            Id = selectedEvent?.Id ?? 0,
+            Title = eventTitle.Text,
+            Start = start,
+            End = end,
+            Location = eventLocation.Text,
+            Description = eventDescription.Text,
+            NotifyPreviousDay = notifyPrevious.IsChecked == true,
+            Notify15Minutes = notify15.IsChecked == true,
+            Notify5Minutes = notify5.IsChecked == true,
+            Notified = selectedEvent?.Notified ?? "",
+            Recurrence = recurrence.SelectedValue as string ?? "None",
+            RecurrenceEnd = recurrenceEnd.SelectedDate?.Date
+        };
         if (selectedEvent?.IsRecurringOccurrence == true && (string?)eventScope.SelectedValue == "Occurrence") Services.Db.SaveEventOccurrence(selectedEvent, edited);
         else Services.Db.SaveEvent(edited);
         NewEventForm(); RefreshEvents();

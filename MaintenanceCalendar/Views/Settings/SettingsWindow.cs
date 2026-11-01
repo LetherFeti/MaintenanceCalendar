@@ -6,11 +6,19 @@ public sealed class SettingsWindow : ToolWindow
 {
     private readonly Dictionary<string, TextBox> colors = [];
     private readonly ComboBox shape = new() { ItemsSource = new[] { "●", "■", "▼" } };
-    private readonly ComboBox missingRecurrenceDate = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key",
-        ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" } };
+    private readonly ComboBox missingRecurrenceDate = new()
+    {
+        DisplayMemberPath = "Value",
+        SelectedValuePath = "Key",
+        ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" }
+    };
     private readonly CheckBox showInTaskbar = new() { Content = "Alt＋Tab に表示する" };
-    private readonly ComboBox sidebarPosition = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key",
-        ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" } };
+    private readonly ComboBox sidebarPosition = new()
+    {
+        DisplayMemberPath = "Value",
+        SelectedValuePath = "Key",
+        ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" }
+    };
     private readonly TextBlock holidayStatus = Ui.Text("");
     private readonly TextBlock startupStatus = Ui.Text("");
     private readonly TextBlock operationStatus = Ui.Text("");
@@ -117,13 +125,24 @@ public sealed class SettingsWindow : ToolWindow
             switch (name)
             {
                 case "SaveButton":
-                    var s = new Settings { ThemeColor = colors["Theme"].Text.Trim(), BackgroundColor = colors["Background"].Text.Trim(), TodayColor = colors["Today"].Text.Trim(), UseColor = colors["Use"].Text.Trim(), CareColor = colors["Care"].Text.Trim(), TodayShape = (string)shape.SelectedItem,
-                        SidebarPosition = (string)sidebarPosition.SelectedValue, SidebarShowLabels = Services.Settings.SidebarShowLabels,
+                    var s = new Settings
+                    {
+                        ThemeColor = colors["Theme"].Text.Trim(),
+                        BackgroundColor = colors["Background"].Text.Trim(),
+                        TodayColor = colors["Today"].Text.Trim(),
+                        UseColor = colors["Use"].Text.Trim(),
+                        CareColor = colors["Care"].Text.Trim(),
+                        TodayShape = (string)shape.SelectedItem,
+                        SidebarPosition = (string)sidebarPosition.SelectedValue,
+                        SidebarShowLabels = Services.Settings.SidebarShowLabels,
                         ShowInTaskbar = showInTaskbar.IsChecked == true,
                         MissingRecurrenceDateBehavior = (string)missingRecurrenceDate.SelectedValue,
-                        WindowLeft = Services.Settings.WindowLeft, WindowTop = Services.Settings.WindowTop,
-                        WindowWidth = Services.Settings.WindowWidth, WindowHeight = Services.Settings.WindowHeight,
-                        HolidayFetchedAt = Services.Settings.HolidayFetchedAt };
+                        WindowLeft = Services.Settings.WindowLeft,
+                        WindowTop = Services.Settings.WindowTop,
+                        WindowWidth = Services.Settings.WindowWidth,
+                        WindowHeight = Services.Settings.WindowHeight,
+                        HolidayFetchedAt = Services.Settings.HolidayFetchedAt
+                    };
                     s.Save(Services.SettingsPath); Services.Settings = s; s.Apply();
                     foreach (Window window in Application.Current.Windows)
                         if (window is MainWindow main) main.ApplyTaskbarSetting();

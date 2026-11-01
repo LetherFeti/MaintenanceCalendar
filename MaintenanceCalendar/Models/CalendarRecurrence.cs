@@ -65,11 +65,20 @@ public static class CalendarRecurrence
 
     public static CalendarEvent Occurrence(CalendarEvent series, DateTime start) => new()
     {
-        Id = series.Id, Title = series.Title, Start = start, End = start + (series.End - series.Start),
-        Location = series.Location, Description = series.Description,
-        NotifyPreviousDay = series.NotifyPreviousDay, Notify15Minutes = series.Notify15Minutes, Notify5Minutes = series.Notify5Minutes,
-        Notified = series.Notified, Recurrence = series.Recurrence, RecurrenceEnd = series.RecurrenceEnd,
-        OriginalStart = start, SeriesStart = series.Start,
+        Id = series.Id,
+        Title = series.Title,
+        Start = start,
+        End = start + (series.End - series.Start),
+        Location = series.Location,
+        Description = series.Description,
+        NotifyPreviousDay = series.NotifyPreviousDay,
+        Notify15Minutes = series.Notify15Minutes,
+        Notify5Minutes = series.Notify5Minutes,
+        Notified = series.Notified,
+        Recurrence = series.Recurrence,
+        RecurrenceEnd = series.RecurrenceEnd,
+        OriginalStart = start,
+        SeriesStart = series.Start,
         IsRecurringOccurrence = series.Recurrence != "None"
     };
 }

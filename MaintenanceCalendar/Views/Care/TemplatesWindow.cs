@@ -39,7 +39,8 @@ public sealed class TemplatesWindow : ToolWindow
         {
             case "SaveButton": Services.Db.SaveTemplate(summary.Text, false); Refresh(); break;
             case "DeleteButton":
-                if (grid.SelectedItem is TemplateRow row && Ui.Confirm("選択した手入れ概要を削除しますか？")) { Services.Db.SaveTemplate(row.Summary, true); Refresh(); } break;
+                if (grid.SelectedItem is TemplateRow row && Ui.Confirm("選択した手入れ概要を削除しますか？")) { Services.Db.SaveTemplate(row.Summary, true); Refresh(); }
+                break;
             case "NewButton": grid.SelectedItem = null; summary.Clear(); summary.Focus(); break;
         }
     });

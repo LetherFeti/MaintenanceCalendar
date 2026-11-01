@@ -17,8 +17,11 @@ internal static class UiChrome
         window.WindowStyle = WindowStyle.None;
         WindowChrome.SetWindowChrome(window, new WindowChrome
         {
-            CaptionHeight = 0, ResizeBorderThickness = new Thickness(6),
-            GlassFrameThickness = new Thickness(0), CornerRadius = new CornerRadius(0), UseAeroCaptionButtons = false
+            CaptionHeight = 0,
+            ResizeBorderThickness = new Thickness(6),
+            GlassFrameThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(0),
+            UseAeroCaptionButtons = false
         });
         var layer = new Grid();
         var body = new Border { Padding = new Thickness(0, autoHide ? 12 : 44, 0, 0), Child = content };
