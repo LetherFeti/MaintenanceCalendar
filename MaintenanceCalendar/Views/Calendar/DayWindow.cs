@@ -40,7 +40,7 @@ public sealed class DayWindow : ToolWindow
     private CalendarEvent? selectedEvent;
 
     /// <summary>当日の登録状況と一括登録の対象を一覧表示します。</summary>
-    public DayWindow(DateTime date, IReadOnlyList<Item> items, long? selected) : base(date.ToString("yyyy年M月d日（ddd）"), 740, 610)
+    public DayWindow(DateTime date, IReadOnlyList<Item> items, long? selected, TimeSpan? initialEventTime = null) : base(date.ToString("yyyy年M月d日（ddd）"), 740, 610)
     {
         this.date = date;
         MinWidth = 660; MinHeight = 800;
@@ -112,6 +112,12 @@ public sealed class DayWindow : ToolWindow
         grid.SelectedItem = rows.FirstOrDefault(x => x.Id == selected);
         Refresh();
         RefreshEvents();
+        if (initialEventTime is { } startAt)
+        {
+            tabs.SelectedIndex = 1;
+            eventStart.Text = startAt.ToString(@"hh\:mm");
+            eventEnd.Text = startAt.Add(TimeSpan.FromHours(1)).ToString(@"hh\:mm");
+        }
         UpdateActionMode();
     }
 

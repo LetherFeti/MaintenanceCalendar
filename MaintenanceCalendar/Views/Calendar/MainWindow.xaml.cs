@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Controls.Primitives;
 
 using System.Windows.Interop;
 using System.Runtime.InteropServices;
@@ -17,6 +18,9 @@ namespace MaintenanceCalendar;
 public partial class MainWindow : Window
 {
     private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
+    private bool restoringWeekScroll;
+    private bool weekScrollInitialized;
     private List<Item> items = [];
     private ComboBox combo = null!;
     private Dictionary<DateTime, string> holidays = [];
@@ -114,7 +118,17 @@ public partial class MainWindow : Window
     /// </summary>
     private void RenderCalendar()
     {
-        var settings = Services.Settings; MonthLabel.Text = month.ToString("yyyy年 M月");
+        var settings = Services.Settings;
+        bool weekView = settings.CalendarView == "Week";
+        ViewButton.Content = weekView ? "月表示" : "週表示";
+        DaysPanel.Visibility = weekView ? Visibility.Collapsed : Visibility.Visible;
+        WeekScroll.Visibility = weekView ? Visibility.Visible : Visibility.Collapsed;
+        MonthWeekdays.Visibility = weekView ? Visibility.Collapsed : Visibility.Visible;
+        WeekHeaderGrid.Visibility = weekView ? Visibility.Visible : Visibility.Collapsed;
+        MonthLabel.FontSize = weekView ? 11 : 16;
+        MonthLabel.Text = weekView ? $"{weekStart:yyyy年 M月 d日}\n～ {weekStart.AddDays(6):M月 d日}" : month.ToString("yyyy年 M月");
+        PrevButton.ToolTip = weekView ? "前の週" : "前の月"; NextButton.ToolTip = weekView ? "次の週" : "次の月";
+        if (weekView) { RenderWeek(); return; }
         SetLegend(TodayLegend, settings.TodayShape, "今日", settings.TodayColor);
         SetLegend(UseLegend, "●", "使用", settings.UseColor);
         SetLegend(CareLegend, "●", "お手入れ", settings.CareColor);
@@ -157,6 +171,104 @@ public partial class MainWindow : Window
         DueButton.Content = $"通知  {dueCount + todayEventCount}件";
         UiMotion.FadeIn(DaysPanel);
     }
+
+    private void RenderWeek()
+    {
+        var settings = Services.Settings;
+        DateTime end = weekStart.AddDays(7);
+        var marks = Services.Db.Month(weekStart, SelectedId).Where(x => x.Date < end).ToLookup(x => x.Date);
+        var events = Services.Db.Events(weekStart, end, settings.MissingRecurrenceDateBehavior).ToList();
+        var itemNames = items.ToDictionary(x => x.Id, x => x.DisplayName);
+        var grid = WeekGrid; grid.Children.Clear(); grid.RowDefinitions.Clear(); grid.ColumnDefinitions.Clear();
+        var headerGrid = WeekHeaderGrid; headerGrid.Children.Clear(); headerGrid.ColumnDefinitions.Clear(); headerGrid.RowDefinitions.Clear();
+        // The ScrollViewer reserves a native-width vertical scrollbar on its right;
+        // reserve the same width above it so all seven day columns share exact edges.
+        headerGrid.Margin = new Thickness(4, 0, 4 + SystemParameters.VerticalScrollBarWidth, 0);
+        grid.Margin = new Thickness(0);
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
+        for (int d = 0; d < 7; d++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 42 });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 42 });
+        }
+        for (int row = 0; row < 48; row++) grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(36) });
+        headerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        AddHeaderCell(0, 0, new Border { BorderBrush = (Brush)FindResource("LineBrush"), BorderThickness = new Thickness(0, 0, 1, 1) });
+        for (int d = 0; d < 7; d++)
+        {
+            DateTime date = weekStart.AddDays(d); var records = marks[date].ToList();
+            var dayEvents = events.Where(x => x.Start.Date == date.Date).ToList();
+            bool hasEvents = dayEvents.Count > 0;
+            var eventBrush = Settings.Brush(settings.ThemeColor);
+            bool holiday = holidays.TryGetValue(date, out var holidayName);
+            var header = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(1, 2, 1, 2) };
+            var dateText = new TextBlock { Text = $"{new[] { "日", "月", "火", "水", "木", "金", "土" }[d]}\n{date:M/d}", FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center,
+                Foreground = hasEvents ? UiPalette.OnColor(eventBrush.Color) : holiday || d == 0 ? Settings.Brush("#BB3030") : d == 6 ? Settings.Brush("#2859B0") : (Brush)FindResource("TextBrush") };
+            header.Children.Add(dateText);
+            if (holiday) header.Children.Add(new TextBlock { Text = holidayName, FontSize = 9, Foreground = hasEvents ? UiPalette.OnColor(eventBrush.Color) : Settings.Brush("#BB3030"), TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 100 });
+            var marksRow = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
+            foreach (int work in new[] { 1, 2 })
+            {
+                var matching = records.Where(x => x.Work == work).ToList(); if (matching.Count == 0) continue;
+                string detail = string.Join("\n", matching.Select(x => $"{(work == 1 ? "使用" : "お手入れ")}: {itemNames.GetValueOrDefault(x.ItemId, "")}"));
+                var marker = new Ellipse { Width = 9, Height = 9, Fill = Settings.Brush(work == 1 ? settings.UseColor : settings.CareColor), Margin = new Thickness(2, 1, 2, 1), ToolTip = detail, Cursor = Cursors.Help };
+                ToolTipService.SetInitialShowDelay(marker, 250); marksRow.Children.Add(marker);
+            }
+            if (marksRow.Children.Count > 0) header.Children.Add(marksRow);
+            var headerBorder = new Border { Child = header, BorderBrush = hasEvents ? eventBrush : (Brush)FindResource("LineBrush"), BorderThickness = hasEvents ? new Thickness(1.5) : new Thickness(0, 0, 1, 1), Background = hasEvents ? eventBrush : date.Date == DateTime.Today ? (Brush)FindResource("AccentSoftBrush") : Brushes.Transparent };
+            var details = records.Select(x => $"{(x.Work == 1 ? "使用" : "お手入れ")}: {itemNames.GetValueOrDefault(x.ItemId, "")}")
+                .Concat(dayEvents.Select(x => $"予定 {x.Start:HH:mm}: {x.Title}"));
+            headerBorder.ToolTip = records.Count + dayEvents.Count == 0 ? null : string.Join("\n", details);
+            AddHeaderCell(0, d + 1, headerBorder);
+        }
+        for (int r = 0; r < 48; r++)
+        {
+            int minute = r * 30;
+            if (minute % 60 == 0) AddCell(r, 0, new TextBlock { Text = $"{minute / 60:00}:00", FontSize = 9, Foreground = (Brush)FindResource("MutedBrush"), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, -6, 3, 0) });
+            for (int d = 0; d < 7; d++)
+            {
+                DateTime date = weekStart.AddDays(d); int slotIndex = r;
+                var slot = new Border { BorderBrush = (Brush)FindResource("LineBrush"), BorderThickness = new Thickness(0, 0, 1, r % 2 == 1 ? 1 : 0.5), Background = Brushes.Transparent, Cursor = Cursors.Hand };
+                slot.MouseLeftButtonUp += (_, _) => OpenWeekDay(date, TimeSpan.FromMinutes(slotIndex * 30));
+                AddCell(r, d + 1, slot);
+            }
+        }
+        foreach (var ev in events)
+        {
+            int day = (ev.Start.Date - weekStart.Date).Days; if (day < 0 || day > 6) continue;
+            int start = Math.Clamp((int)(ev.Start.TimeOfDay.TotalMinutes / 30), 0, 47);
+            int finish = Math.Clamp((int)Math.Ceiling(ev.End.TimeOfDay.TotalMinutes / 30), start + 1, 48);
+            var block = new Border { Background = Settings.Brush(settings.ThemeColor), CornerRadius = new CornerRadius(4), Margin = new Thickness(2), Padding = new Thickness(3, 1, 2, 1), ClipToBounds = true,
+                Child = new TextBlock { Text = $"{ev.Start:HH:mm} {ev.Title}", Foreground = Brushes.White, FontSize = 10, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Top } };
+            Grid.SetRow(block, start); Grid.SetRowSpan(block, Math.Max(1, finish - start)); Grid.SetColumn(block, day + 1); grid.Children.Add(block);
+            block.ToolTip = string.Join("\n", new[] { $"{ev.Start:yyyy/MM/dd HH:mm} ～ {ev.End:HH:mm}", ev.Title, ev.Location, ev.Description }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            block.Cursor = Cursors.Hand;
+            block.MouseLeftButtonUp += (_, _) => OpenWeekDay(ev.Start.Date, TimeSpan.FromMinutes(start * 30));
+        }
+        if (!weekScrollInitialized)
+        {
+            weekScrollInitialized = true; restoringWeekScroll = true;
+            Dispatcher.BeginInvoke(new Action(() => { WeekScroll.ScrollToVerticalOffset(settings.WeekScrollOffset); restoringWeekScroll = false; }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+        DueButton.Content = $"通知  {dueCount + todayEventCount}件";
+        void AddCell(int row, int column, UIElement element) { Grid.SetRow(element, row); Grid.SetColumn(element, column); grid.Children.Add(element); }
+        void AddHeaderCell(int row, int column, UIElement element) { Grid.SetRow(element, row); Grid.SetColumn(element, column); headerGrid.Children.Add(element); }
+    }
+
+    private void OpenWeekDay(DateTime date, TimeSpan time)
+    {
+        if (locked) return;
+        Ui.Show(this, new DayWindow(date, items, SelectedId, time));
+        RefreshDueCount(); RenderCalendar();
+    }
+
+    private void WeekScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (restoringWeekScroll || e.VerticalChange == 0) return;
+        Services.Settings.WeekScrollOffset = e.VerticalOffset;
+        Services.Settings.Save(Services.SettingsPath);
+    }
     /// <summary>
     /// 誤クリック予防を確認し、月移動・子画面表示・終了などの選択された操作を実行します。
     /// </summary>
@@ -168,9 +280,10 @@ public partial class MainWindow : Window
         {
             switch (name)
             {
-                case "PrevButton": if (month.Year > 1900) month = month.AddMonths(-1); RenderCalendar(); break;
-                case "NextButton": if (month.Year < 9998) month = month.AddMonths(1); RenderCalendar(); break;
-                case "TodayButton": month = new(DateTime.Today.Year, DateTime.Today.Month, 1); RenderCalendar(); break;
+                case "PrevButton": if (Services.Settings.CalendarView == "Week") weekStart = weekStart.AddDays(-7); else if (month.Year > 1900) month = month.AddMonths(-1); RenderCalendar(); break;
+                case "NextButton": if (Services.Settings.CalendarView == "Week") weekStart = weekStart.AddDays(7); else if (month.Year < 9998) month = month.AddMonths(1); RenderCalendar(); break;
+                case "TodayButton": month = new(DateTime.Today.Year, DateTime.Today.Month, 1); weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek); RenderCalendar(); break;
+                case "ViewButton": Services.Settings.CalendarView = Services.Settings.CalendarView == "Month" ? "Week" : "Month"; Services.Settings.Save(Services.SettingsPath); RenderCalendar(); break;
                 case "DayButton": Ui.Show(this, new DayWindow((DateTime)((Button)sender).Tag, items, SelectedId)); RefreshDueCount(); RenderCalendar(); break;
                 case "ItemsButton": case "MenuItems": Ui.Show(this, new ItemsWindow()); RefreshData(); break;
                 case "MenuTemplates": Ui.Show(this, new TemplatesWindow()); RefreshData(); break;

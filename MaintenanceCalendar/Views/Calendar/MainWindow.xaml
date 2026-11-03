@@ -53,13 +53,15 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Button Name="PrevButton" Content="‹" ToolTip="前の月" AutomationProperties.Name="前の月" Click="Button_Click" Padding="9,3" Background="Transparent" BorderThickness="0"/>
-                <TextBlock Name="MonthLabel" Grid.Column="1" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                <Button Name="NextButton" Grid.Column="2" Content="›" ToolTip="次の月" AutomationProperties.Name="次の月" Click="Button_Click" Padding="9,3" Background="Transparent" BorderThickness="0"/>
+                <Button Name="PrevButton" Content="‹" ToolTip="前の月" AutomationProperties.Name="前の月" Click="Button_Click" Padding="12,4" MinWidth="38" MinHeight="36" FontSize="22" Background="Transparent" BorderThickness="0"/>
+                <TextBlock Name="MonthLabel" Grid.Column="1" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                <Button Name="NextButton" Grid.Column="2" Content="›" ToolTip="次の月" AutomationProperties.Name="次の月" Click="Button_Click" Padding="12,4" MinWidth="38" MinHeight="36" FontSize="22" Background="Transparent" BorderThickness="0"/>
                 <Button Name="TodayButton" Grid.Column="3" Content="今日" ToolTip="今日のある月に戻る" Click="Button_Click" Padding="9,3" FontSize="11" Background="{DynamicResource AccentSoftBrush}" BorderThickness="0"/>
+                <Button Name="ViewButton" Grid.Column="4" Content="週表示" ToolTip="月表示と週表示を切り替え" Click="Button_Click" Padding="9,3" FontSize="11" Margin="5,0,0,0" Background="{DynamicResource AccentSoftBrush}" BorderThickness="0"/>
             </Grid>
-            <UniformGrid Grid.Row="3" Rows="1" Columns="7" Margin="0,6">
+            <UniformGrid Name="MonthWeekdays" Grid.Row="3" Rows="1" Columns="7" Margin="0,6">
                 <TextBlock Text="日" Foreground="#BB3030" HorizontalAlignment="Center"/>
                 <TextBlock Text="月" HorizontalAlignment="Center"/>
                 <TextBlock Text="火" HorizontalAlignment="Center"/>
@@ -69,6 +71,10 @@
                 <TextBlock Text="土" Foreground="#2859B0" HorizontalAlignment="Center"/>
             </UniformGrid>
             <UniformGrid Name="DaysPanel" Grid.Row="4" Rows="6" Columns="7" Margin="4,0,4,6"/>
+            <Grid Name="WeekHeaderGrid" Grid.Row="3" Margin="4,0,4,0" Visibility="Collapsed"/>
+            <ScrollViewer Name="WeekScroll" Grid.Row="4" Margin="4,0,4,6" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ScrollChanged="WeekScroll_ScrollChanged">
+                <Grid Name="WeekGrid"/>
+            </ScrollViewer>
             <StackPanel Grid.Row="5" Margin="0,6,0,0">
                 <WrapPanel>
                     <TextBlock Name="TodayLegend" Margin="3"/>

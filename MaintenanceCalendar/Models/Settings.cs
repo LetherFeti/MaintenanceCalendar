@@ -22,6 +22,8 @@ public sealed class Settings
     public double? WindowTop { get; set; }
     public double? WindowWidth { get; set; }
     public double? WindowHeight { get; set; }
+    public string CalendarView { get; set; } = "Month";
+    public double WeekScrollOffset { get; set; } = 44 + 18 * 36;
 
     /// <summary>
     /// 設定JSONを読み込み、ファイルがない場合は既定設定を返します。
@@ -42,6 +44,8 @@ public sealed class Settings
         if (!new[] { "●", "■", "▼" }.Contains(TodayShape)) throw new InvalidDataException("今日の図形が不正です。");
         if (!new[] { "Left", "Right", "Top", "Bottom" }.Contains(SidebarPosition)) throw new InvalidDataException("サイドバーの位置が不正です。");
         if (!new[] { "LastDay", "Skip" }.Contains(MissingRecurrenceDateBehavior)) throw new InvalidDataException("定期予定の基準日処理が不正です。");
+        if (!new[] { "Month", "Week" }.Contains(CalendarView)) throw new InvalidDataException("カレンダー表示が不正です。");
+        if (!double.IsFinite(WeekScrollOffset) || WeekScrollOffset < 0) WeekScrollOffset = 44 + 18 * 36;
         foreach (var value in new[] { WindowLeft, WindowTop, WindowWidth, WindowHeight })
             if (value.HasValue && !double.IsFinite(value.Value)) throw new InvalidDataException("ウィンドウ位置が不正です。");
     }
