@@ -17,13 +17,13 @@
         </WrapPanel>
         <DataGrid x:Name="Grid" IsReadOnly="False">
             <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="選択" Binding="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="Auto"/>
-                <DataGridTextColumn Header="メーカー" Binding="{Binding Manufacturer}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="モデル" Binding="{Binding Model}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="色" Binding="{Binding Color}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="購入日" Binding="{Binding PurchaseDate, StringFormat=yyyy/MM/dd}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="間隔" Binding="{Binding IntervalLabel}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="状態" Binding="{Binding Status}" IsReadOnly="True" Width="*"/>
+                <DataGridCheckBoxColumn Header="選択" Binding="{Binding IsChecked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ElementStyle="{StaticResource DataGridCheckBoxStyle}" Width="Auto"/>
+                <DataGridTextColumn Header="メーカー" Binding="{Binding Manufacturer}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="モデル" Binding="{Binding Model}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="色" Binding="{Binding Color}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="購入日" Binding="{Binding PurchaseDate, StringFormat=yyyy/MM/dd}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="間隔" Binding="{Binding IntervalLabel}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="状態" Binding="{Binding Status}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

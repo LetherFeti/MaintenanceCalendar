@@ -12,18 +12,16 @@
         </WrapPanel>
         <TabControl x:Name="Tabs">
             <TabItem Header="使用・お手入れ">
-                <DockPanel>
+                <DockPanel TextElement.Foreground="{DynamicResource TextBrush}">
                     <StackPanel DockPanel.Dock="Top">
                         <TextBlock Text="メーカー・モデル・色で検索"/>
                         <WrapPanel VerticalAlignment="Center">
                             <TextBox x:Name="Search" MinWidth="220"/>
-                            <CheckBox x:Name="ShowUsed" Content="使用済を表示" IsChecked="True"/>
-                            <CheckBox x:Name="ShowCared" Content="お手入れ済みを表示"/>
+                            <CheckBox x:Name="ShowUsed" Content="使用済みだけを表示"/>
+                            <CheckBox x:Name="ShowCared" Content="お手入れ済みだけを表示"/>
                         </WrapPanel>
                         <WrapPanel x:Name="BatchActions">
                             <Button x:Name="CheckAllButton" Content="全チェック / 解除"/>
-                            <Button x:Name="BatchUseButton" Content="チェック分を使用登録"/>
-                            <Button x:Name="BatchCareButton" Content="チェック分をお手入れ登録"/>
                         </WrapPanel>
                         <TextBlock x:Name="BatchStatus"/>
                     </StackPanel>
@@ -32,19 +30,19 @@
                         <TextBlock Text="お手入れメモ（表示のみ。編集は下部の「お手入れ」ボタン）" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}"/>
                         <TextBox x:Name="Memo" IsReadOnly="True" IsTabStop="False" Focusable="False" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="85"/>
                     </StackPanel>
-                    <DataGrid x:Name="Grid" Margin="0,8">
+                    <DataGrid x:Name="Grid" IsReadOnly="False" Margin="0,8">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="メーカー" Binding="{Binding Manufacturer}" Width="*"/>
-                            <DataGridTextColumn Header="モデル" Binding="{Binding Model}" Width="*"/>
-                            <DataGridTextColumn Header="色" Binding="{Binding Color}" Width="*"/>
-                            <DataGridTextColumn Header="使用" Binding="{Binding UseStatus}" Width="100"/>
-                            <DataGridTextColumn Header="お手入れ" Binding="{Binding CareStatus}" Width="120"/>
+                            <DataGridTextColumn Header="メーカー" Binding="{Binding Manufacturer}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="モデル" Binding="{Binding Model}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="色" Binding="{Binding Color}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
+                            <DataGridTextColumn Header="使用" Binding="{Binding UseStatus}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="100"/>
+                            <DataGridTextColumn Header="お手入れ" Binding="{Binding CareStatus}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="120"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
             </TabItem>
             <TabItem x:Name="EventTab" Header="予定">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer TextElement.Foreground="{DynamicResource TextBrush}" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="4">
                         <DockPanel Margin="2,0,2,8">
                             <TextBlock x:Name="EventCount" Text="一覧から選ぶと編集できます" FontSize="12" Foreground="{DynamicResource MutedBrush}" DockPanel.Dock="Right"/>

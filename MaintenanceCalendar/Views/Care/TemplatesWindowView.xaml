@@ -15,8 +15,8 @@
         </WrapPanel>
         <DataGrid x:Name="Grid">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="手入れ概要" Binding="{Binding Summary}" Width="*"/>
-                <DataGridTextColumn Header="状態" Binding="{Binding Status}" Width="*"/>
+                <DataGridTextColumn Header="手入れ概要" Binding="{Binding Summary}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="状態" Binding="{Binding Status}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

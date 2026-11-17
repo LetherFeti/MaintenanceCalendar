@@ -11,9 +11,9 @@
         <TextBox x:Name="Memo" DockPanel.Dock="Bottom" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="90" VerticalScrollBarVisibility="Auto"/>
         <DataGrid x:Name="Grid" Margin="0,8">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="日付" Binding="{Binding Date, StringFormat=yyyy/MM/dd}" Width="*"/>
-                <DataGridTextColumn Header="作業" Binding="{Binding WorkLabel}" Width="*"/>
-                <DataGridTextColumn Header="お手入れメモ" Binding="{Binding Memo}" Width="2*"/>
+                <DataGridTextColumn Header="日付" Binding="{Binding Date, StringFormat=yyyy/MM/dd}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="作業" Binding="{Binding WorkLabel}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="お手入れメモ" Binding="{Binding Memo}" ElementStyle="{StaticResource DataGridTextStyle}" Width="2*"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

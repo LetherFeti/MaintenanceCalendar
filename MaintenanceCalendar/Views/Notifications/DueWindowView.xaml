@@ -22,10 +22,10 @@
             <TextBlock Text="未手入れの場合は購入日、購入日がなければ登録日を基準にしています。" TextWrapping="Wrap"/>
             <DataGrid x:Name="Grid" MinHeight="160" MaxHeight="280" Margin="0,8">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="所持品" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="最終お手入れ" Binding="{Binding LastCareText}" Width="*"/>
-                    <DataGridTextColumn Header="基準日" Binding="{Binding BaseText}" Width="*"/>
-                    <DataGridTextColumn Header="お手入れ期限" Binding="{Binding DueText}" Width="*"/>
+                    <DataGridTextColumn Header="所持品" Binding="{Binding Name}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                    <DataGridTextColumn Header="最終お手入れ" Binding="{Binding LastCareText}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                    <DataGridTextColumn Header="基準日" Binding="{Binding BaseText}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                    <DataGridTextColumn Header="お手入れ期限" Binding="{Binding DueText}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
                 </DataGrid.Columns>
             </DataGrid>
         </StackPanel>

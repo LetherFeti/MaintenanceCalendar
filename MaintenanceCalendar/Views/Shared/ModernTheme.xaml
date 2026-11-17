@@ -14,7 +14,8 @@
         <Setter Property="Background" Value="{DynamicResource CreamBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
         <Setter Property="UseLayoutRounding" Value="True"/>
-        <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal"/>
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
     </Style>
     <Style TargetType="Button">
         <Setter Property="Margin" Value="3"/>
@@ -134,6 +135,12 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <Style x:Key="DataGridTextStyle" TargetType="TextBlock">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style x:Key="DataGridCheckBoxStyle" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+        <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style TargetType="ComboBox">
         <Setter Property="Padding" Value="8,5"/>
@@ -290,6 +297,7 @@
         </Setter>
     </Style>
     <Style TargetType="DataGrid">
+        <Setter Property="IsReadOnly" Value="True"/>
         <Setter Property="AutoGenerateColumns" Value="False"/>
         <Setter Property="CanUserAddRows" Value="False"/>
         <Setter Property="CanUserDeleteRows" Value="False"/>

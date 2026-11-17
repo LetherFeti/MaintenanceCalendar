@@ -8,11 +8,11 @@
         </StackPanel>
         <DataGrid x:Name="Grid" Margin="0,8">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="予定" Binding="{Binding Title}" Width="2*"/>
-                <DataGridTextColumn Header="開始" Binding="{Binding Start, StringFormat=yyyy/MM/dd HH:mm}" Width="*"/>
-                <DataGridTextColumn Header="繰り返し" Binding="{Binding RecurrenceLabel}" Width="*"/>
-                <DataGridTextColumn Header="終了日" Binding="{Binding RecurrenceEnd, StringFormat=yyyy/MM/dd}" Width="*"/>
-                <DataGridTextColumn Header="場所" Binding="{Binding Location}" Width="*"/>
+                <DataGridTextColumn Header="予定" Binding="{Binding Title}" ElementStyle="{StaticResource DataGridTextStyle}" Width="2*"/>
+                <DataGridTextColumn Header="開始" Binding="{Binding Start, StringFormat=yyyy/MM/dd HH:mm}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="繰り返し" Binding="{Binding RecurrenceLabel}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="終了日" Binding="{Binding RecurrenceEnd, StringFormat=yyyy/MM/dd}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
+                <DataGridTextColumn Header="場所" Binding="{Binding Location}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

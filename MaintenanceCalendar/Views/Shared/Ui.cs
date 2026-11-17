@@ -53,7 +53,7 @@ public static class Ui
     public static DataGrid Grid(params (string Header, string Path)[] columns)
     {
         var grid = new DataGrid { IsReadOnly = true, Margin = new Thickness(0, 8, 0, 8) };
-        foreach (var c in columns) grid.Columns.Add(new DataGridTextColumn { Header = c.Header, Binding = new Binding(c.Path), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        foreach (var c in columns) grid.Columns.Add(new DataGridTextColumn { Header = c.Header, Binding = new Binding(c.Path), ElementStyle = (Style)Application.Current.FindResource("DataGridTextStyle"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
         return grid;
     }
 

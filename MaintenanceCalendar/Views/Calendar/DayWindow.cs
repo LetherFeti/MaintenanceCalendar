@@ -15,7 +15,7 @@ public sealed class DayWindow : ToolWindow
     private TextBox search => view.Search;
     private CheckBox showUsed => view.ShowUsed;
     private CheckBox showCared => view.ShowCared;
-    private readonly Button use, care, cancelCare, batchUse, batchCare;
+    private readonly Button use, care, cancelCare;
     private TextBlock status => view.Status;
     private TextBlock batchStatus => view.BatchStatus;
     private TextBox memo => view.Memo;
@@ -49,7 +49,6 @@ public sealed class DayWindow : ToolWindow
         MinWidth = 660; MinHeight = 800;
         Cursor = Cursors.Arrow;
         use = view.UseButton; care = view.CareButton; cancelCare = view.CancelCareButton;
-        batchUse = view.BatchUseButton; batchCare = view.BatchCareButton;
         recurrence.ItemsSource = new Dictionary<string, string> { ["None"] = "繰り返しなし", ["Weekly"] = "毎週", ["Biweekly"] = "隔週", ["Monthly"] = "毎月", ["Yearly"] = "毎年" };
         eventScope.ItemsSource = new Dictionary<string, string> { ["Occurrence"] = "この回だけ", ["Series"] = "シリーズ全体" };
         search.Cursor = eventTitle.Cursor = eventStart.Cursor = eventEnd.Cursor = eventLocation.Cursor = eventDescription.Cursor = Cursors.IBeam;
@@ -59,13 +58,15 @@ public sealed class DayWindow : ToolWindow
         visibleRows = CollectionViewSource.GetDefaultView(rows);
         visibleRows.Filter = MatchesFilter;
         showUsed.Cursor = showCared.Cursor = Cursors.Arrow;
-        batchUse.Cursor = batchCare.Cursor = view.CheckAllButton.Cursor = Cursors.Arrow;
-        foreach (var button in new[] { view.CheckAllButton, batchUse, batchCare, use, care, cancelCare }) button.Click += Button_Click;
+        view.CheckAllButton.Cursor = Cursors.Arrow;
+        foreach (var button in new[] { view.CheckAllButton, use, care, cancelCare }) button.Click += Button_Click;
         saveEventButton.Click += EventButton_Click; deleteEventButton.Click += EventButton_Click;
 
         search.TextChanged += (_, _) => RefreshFilter();
-        showUsed.Checked += (_, _) => RefreshFilter(); showUsed.Unchecked += (_, _) => RefreshFilter();
-        showCared.Checked += (_, _) => RefreshFilter(); showCared.Unchecked += (_, _) => RefreshFilter();
+        showUsed.Checked += (_, _) => { showCared.IsChecked = false; RefreshFilter(); };
+        showUsed.Unchecked += (_, _) => RefreshFilter();
+        showCared.Checked += (_, _) => { showUsed.IsChecked = false; RefreshFilter(); };
+        showCared.Unchecked += (_, _) => RefreshFilter();
 
         var check = new FrameworkElementFactory(typeof(CheckBox));
         check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
@@ -77,12 +78,20 @@ public sealed class DayWindow : ToolWindow
         grid.Columns[4].Width = 100; grid.Columns[5].Width = 120;
         grid.ItemsSource = visibleRows;
         grid.Cursor = Cursors.Arrow;
+        grid.MouseDoubleClick += (_, e) =>
+        {
+            if (e.OriginalSource is not DependencyObject source
+                || ItemsControl.ContainerFromElement(grid, source) is not DataGridRow clickedRow
+                || clickedRow.Item is not DayItem item) return;
+            item.IsChecked = !item.IsChecked;
+            e.Handled = true;
+        };
         var rowStyle = new Style(typeof(DataGridRow));
         rowStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, "写真"));
         rowStyle.Setters.Add(new Setter(ToolTipService.InitialShowDelayProperty, 250));
         rowStyle.Setters.Add(new EventSetter(ToolTipService.ToolTipOpeningEvent, new ToolTipEventHandler(Row_ToolTipOpening)));
         grid.RowStyle = rowStyle;
-        foreach (var row in rows) row.PropertyChanged += (_, _) => UpdateBatchStatus();
+        foreach (var row in rows) row.PropertyChanged += (_, _) => { UpdateBatchStatus(); UpdateSelection(); };
 
         BuildEventTab();
         tabs.SelectionChanged += (_, _) => UpdateActionMode();
@@ -232,8 +241,8 @@ public sealed class DayWindow : ToolWindow
     private bool MatchesFilter(object value)
     {
         if (value is not DayItem row) return false;
-        if (showUsed.IsChecked != true && row.Used) return false;
-        if (showCared.IsChecked != true && row.Cared) return false;
+        if (showUsed.IsChecked == true && !row.Used) return false;
+        if (showCared.IsChecked == true && !row.Cared) return false;
         string query = search.Text.Trim();
         return query.Length == 0 || row.Manufacturer.Contains(query, StringComparison.CurrentCultureIgnoreCase)
             || row.Model.Contains(query, StringComparison.CurrentCultureIgnoreCase)
@@ -277,7 +286,6 @@ public sealed class DayWindow : ToolWindow
     {
         var targets = visibleRows.Cast<DayItem>().Where(x => x.IsChecked).ToList();
         int uses = targets.Count(x => !x.Used), cares = targets.Count(x => !x.Cared);
-        batchUse.IsEnabled = uses > 0; batchCare.IsEnabled = cares > 0;
         batchStatus.Text = $"チェック：{targets.Count}件　未登録：使用 {uses}件 ／ お手入れ {cares}件";
     }
 
@@ -285,9 +293,11 @@ public sealed class DayWindow : ToolWindow
     {
         var row = grid.SelectedItem as DayItem;
         var entry = records.FirstOrDefault(x => x.ItemId == row?.Id && x.Work == 2);
-        use.IsEnabled = care.IsEnabled = row is not null;
-        use.Content = row?.Used == true ? "使用取消" : "使用";
-        care.Content = entry is null ? "お手入れ" : "手入れメモ編集";
+        var targets = visibleRows.Cast<DayItem>().Where(x => x.IsChecked).ToList();
+        use.IsEnabled = targets.Count > 0 ? targets.Any(x => !x.Used) : row is not null;
+        care.IsEnabled = targets.Count > 0 ? targets.Any(x => !x.Cared) : row is not null;
+        use.Content = targets.Count > 0 ? "使用登録" : row?.Used == true ? "使用取消" : "使用";
+        care.Content = targets.Count > 0 ? "お手入れ登録" : entry is null ? "お手入れ" : "手入れメモ編集";
         cancelCare.IsEnabled = entry is not null; memo.Text = entry?.Memo ?? "";
         status.Text = row is null ? "個別操作：一覧から行を選択してください。" : $"個別操作：{row.Item.DisplayName}";
     }
@@ -303,10 +313,11 @@ public sealed class DayWindow : ToolWindow
             foreach (var row in visible) row.IsChecked = check;
             grid.Items.Refresh(); return;
         }
-        if (name is "BatchUseButton" or "BatchCareButton")
+        var checkedRows = visibleRows.Cast<DayItem>().Where(x => x.IsChecked).ToList();
+        if (checkedRows.Count > 0 && (name is "UseButton" or "CareButton"))
         {
-            int work = name == "BatchUseButton" ? 1 : 2;
-            var targets = visibleRows.Cast<DayItem>().Where(x => x.IsChecked && (work == 1 ? !x.Used : !x.Cared)).Select(x => x.Id).ToArray();
+            int work = name == "UseButton" ? 1 : 2;
+            var targets = checkedRows.Where(x => work == 1 ? !x.Used : !x.Cared).Select(x => x.Id).ToArray();
             if (targets.Length == 0) return;
             string commonMemo = "";
             if (work == 2)
