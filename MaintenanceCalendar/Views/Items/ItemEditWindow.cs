@@ -1,17 +1,19 @@
 using Microsoft.Win32;
-using System.Windows.Data;
 
 namespace MaintenanceCalendar;
 
 public sealed class ItemEditWindow : ToolWindow
 {
     private readonly Item item;
-    private readonly TextBox manufacturer = new() { MaxLength = 100 }, model = new() { MaxLength = 150 }, color = new() { MaxLength = 100 };
-    private readonly TextBox memo = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 70, MaxLength = 20000 };
-    private readonly DatePicker purchase = new() { DisplayDateStart = new DateTime(1900, 1, 1), DisplayDateEnd = new DateTime(9998, 12, 31) };
-    private readonly ComboBox interval = new() { ItemsSource = Intervals.All, DisplayMemberPath = "Label", SelectedValuePath = "Key" };
-    private readonly Image photo = new() { MaxHeight = 120, MaxWidth = 160, Stretch = Stretch.Uniform };
-    private readonly TextBlock photoStatus = Ui.Text("写真をここにドロップ、または選択してください。");
+    private readonly ItemEditWindowView view;
+    private TextBox manufacturer => view.Manufacturer;
+    private TextBox model => view.Model;
+    private TextBox color => view.Color;
+    private TextBox memo => view.Memo;
+    private DatePicker purchase => view.Purchase;
+    private ComboBox interval => view.Interval;
+    private Image photo => view.Photo;
+    private TextBlock photoStatus => view.PhotoStatus;
     private string? pendingPhoto;
     private bool clearPhoto;
     private readonly InputSuggestions manufacturerSuggestions, modelSuggestions;
@@ -22,35 +24,27 @@ public sealed class ItemEditWindow : ToolWindow
     public ItemEditWindow(Item item) : base(item.Id == 0 ? "所持品の登録" : "所持品の編集", 510, 760)
     {
         this.item = item;
-
-        var panel = new StackPanel(); Root.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
+        view = new ItemEditWindowView(); Root.Children.Add(view);
+        interval.ItemsSource = Intervals.All;
 
         manufacturer.Text = item.Manufacturer; model.Text = item.Model; color.Text = item.Color;
 
         purchase.SelectedDate = item.PurchaseDate; interval.SelectedValue = item.IntervalKey; memo.Text = item.Memo;
 
-        Ui.Field(panel, "メーカー（必須）", manufacturer); Ui.Field(panel, "モデル（必須）", model); Ui.Field(panel, "色", color);
         var catalog = new ItemCatalog(ItemCatalog.FilePath);
         manufacturerSuggestions = new InputSuggestions(manufacturer, catalog.Manufacturers);
         modelSuggestions = new InputSuggestions(model, query => catalog.Models(manufacturer.Text, query), suggestion =>
         {
             if (string.IsNullOrWhiteSpace(manufacturer.Text) && suggestion.Manufacturer != null) manufacturer.Text = suggestion.Manufacturer;
         });
-        panel.Children.Add(Ui.Text(catalog.Error ?? "メーカー・モデルの候補：↑↓で選択、Tab / Enterで確定、Escで閉じる。手入力も可能です。", 11));
-
-        Ui.Field(panel, "購入日（空欄可）", purchase); Ui.Field(panel, "お手入れ間隔", interval); Ui.Field(panel, "メモ", memo);
-
-        var drop = new Border { BorderBrush = Brushes.Tan, BorderThickness = new Thickness(1), Padding = new Thickness(12), AllowDrop = true };
-
-        var photoPanel = new StackPanel(); photoPanel.Children.Add(photoStatus); photoPanel.Children.Add(photo); drop.Child = photoPanel; panel.Children.Add(drop);
+        view.CatalogHelp.Text = catalog.Error ?? "メーカー・モデルの候補：↑↓で選択、Tab / Enterで確定、Escで閉じる。手入力も可能です。";
 
         photo.Source = Services.LoadPhoto(item.Photo);
 
-        drop.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
+        view.PhotoDrop.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
 
-        drop.Drop += (_, e) => Ui.Run(() => { if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) SelectPhoto(files[0]); });
-
-        var buttons = new WrapPanel(); buttons.Children.Add(Ui.Button("PhotoButton", "写真を選択", Button_Click)); buttons.Children.Add(Ui.Button("ClearPhotoButton", "写真を外す", Button_Click)); panel.Children.Add(buttons);
+        view.PhotoDrop.Drop += (_, e) => Ui.Run(() => { if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) SelectPhoto(files[0]); });
+        view.PhotoButton.Click += Button_Click; view.ClearPhotoButton.Click += Button_Click;
 
         AddButton("SaveButton", "保存", Button_Click); AddButton("CancelButton", "キャンセル", Button_Click);
     }

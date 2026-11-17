@@ -8,61 +8,60 @@ namespace MaintenanceCalendar;
 public sealed class DayWindow : ToolWindow
 {
     private readonly DateTime date;
-    private readonly DataGrid grid = Ui.Grid(("メーカー", "Manufacturer"), ("モデル", "Model"), ("色", "Color"), ("使用", "UseStatus"), ("お手入れ", "CareStatus"));
+    private readonly DayWindowView view;
+    private DataGrid grid => view.Grid;
     private readonly List<DayItem> rows;
     private readonly ICollectionView visibleRows;
-    private readonly TextBox search = new() { MinWidth = 220 };
-    private readonly CheckBox showUsed = new() { Content = "使用済を表示", IsChecked = true };
-    private readonly CheckBox showCared = new() { Content = "お手入れ済みを表示", IsChecked = false };
+    private TextBox search => view.Search;
+    private CheckBox showUsed => view.ShowUsed;
+    private CheckBox showCared => view.ShowCared;
     private readonly Button use, care, cancelCare, batchUse, batchCare;
-    private readonly TextBlock status = Ui.Text("");
-    private readonly TextBlock batchStatus = Ui.Text("");
-    private readonly TextBox memo = new() { IsReadOnly = true, IsTabStop = false, Focusable = false, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = 85 };
+    private TextBlock status => view.Status;
+    private TextBlock batchStatus => view.BatchStatus;
+    private TextBox memo => view.Memo;
     private List<HistoryRow> records = [];
-    private readonly ListBox eventList = new() { MinHeight = 90 };
-    private readonly TextBox eventTitle = new() { MinWidth = 260 };
-    private readonly TextBox eventStart = new() { Width = 100, Text = "09:00" };
-    private readonly TextBox eventEnd = new() { Width = 100, Text = "10:00" };
-    private readonly TextBox eventLocation = new() { MinWidth = 220 };
-    private readonly TextBox eventDescription = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 65, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-    private readonly CheckBox notifyPrevious = new() { Content = "前日", IsChecked = true };
-    private readonly CheckBox notify15 = new() { Content = "15分前", IsChecked = true };
-    private readonly CheckBox notify5 = new() { Content = "5分前", IsChecked = true };
-    private readonly DatePicker eventDate = new();
-    private readonly ComboBox recurrence = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key", ItemsSource = new Dictionary<string, string> { ["None"] = "繰り返しなし", ["Weekly"] = "毎週", ["Biweekly"] = "隔週", ["Monthly"] = "毎月", ["Yearly"] = "毎年" } };
-    private readonly DatePicker recurrenceEnd = new();
-    private readonly ComboBox eventScope = new() { DisplayMemberPath = "Value", SelectedValuePath = "Key", ItemsSource = new Dictionary<string, string> { ["Occurrence"] = "この回だけ", ["Series"] = "シリーズ全体" }, Visibility = Visibility.Collapsed };
-    private FrameworkElement? recurrenceEndField, eventScopeField;
-    private readonly TextBlock eventFormHeading = Ui.Text("新しい予定", 16);
-    private Button? saveEventButton;
-    private Button? deleteEventButton;
-    private TabControl? tabs;
+    private ListBox eventList => view.EventList;
+    private TextBox eventTitle => view.EventTitle;
+    private TextBox eventStart => view.EventStart;
+    private TextBox eventEnd => view.EventEnd;
+    private TextBox eventLocation => view.EventLocation;
+    private TextBox eventDescription => view.EventDescription;
+    private CheckBox notifyPrevious => view.NotifyPrevious;
+    private CheckBox notify15 => view.Notify15;
+    private CheckBox notify5 => view.Notify5;
+    private DatePicker eventDate => view.EventDate;
+    private ComboBox recurrence => view.Recurrence;
+    private DatePicker recurrenceEnd => view.RecurrenceEnd;
+    private ComboBox eventScope => view.EventScope;
+    private FrameworkElement recurrenceEndField => view.RecurrenceEndField;
+    private FrameworkElement eventScopeField => view.EventScopeField;
+    private TextBlock eventFormHeading => view.EventFormHeading;
+    private Button saveEventButton => view.SaveEventButton;
+    private Button deleteEventButton => view.DeleteEventButton;
+    private TabControl tabs => view.Tabs;
     private CalendarEvent? selectedEvent;
 
     /// <summary>当日の登録状況と一括登録の対象を一覧表示します。</summary>
     public DayWindow(DateTime date, IReadOnlyList<Item> items, long? selected, TimeSpan? initialEventTime = null) : base(date.ToString("yyyy年M月d日（ddd）"), 740, 610)
     {
         this.date = date;
+        view = new DayWindowView(); Root.Children.Add(view);
         MinWidth = 660; MinHeight = 800;
         Cursor = Cursors.Arrow;
+        use = view.UseButton; care = view.CareButton; cancelCare = view.CancelCareButton;
+        batchUse = view.BatchUseButton; batchCare = view.BatchCareButton;
+        recurrence.ItemsSource = new Dictionary<string, string> { ["None"] = "繰り返しなし", ["Weekly"] = "毎週", ["Biweekly"] = "隔週", ["Monthly"] = "毎月", ["Yearly"] = "毎年" };
+        eventScope.ItemsSource = new Dictionary<string, string> { ["Occurrence"] = "この回だけ", ["Series"] = "シリーズ全体" };
         search.Cursor = eventTitle.Cursor = eventStart.Cursor = eventEnd.Cursor = eventLocation.Cursor = eventDescription.Cursor = Cursors.IBeam;
         memo.Cursor = Cursors.Arrow;
         eventDate.Cursor = notifyPrevious.Cursor = notify15.Cursor = notify5.Cursor = Cursors.Arrow;
         rows = items.Select(x => new DayItem(x)).ToList();
         visibleRows = CollectionViewSource.GetDefaultView(rows);
         visibleRows.Filter = MatchesFilter;
-        AddTop(Ui.Text("使用・お手入れを記録", 17));
-
-        var filters = new WrapPanel { VerticalAlignment = VerticalAlignment.Center };
-        filters.Children.Add(search); filters.Children.Add(showUsed); filters.Children.Add(showCared);
         showUsed.Cursor = showCared.Cursor = Cursors.Arrow;
-
-        var batchActions = new WrapPanel();
-        var checkAll = Ui.Button("CheckAllButton", "全チェック / 解除", Button_Click); checkAll.Cursor = Cursors.Arrow; batchActions.Children.Add(checkAll);
-        batchUse = Ui.Button("BatchUseButton", "チェック分を使用登録", Button_Click); batchActions.Children.Add(batchUse);
-        batchCare = Ui.Button("BatchCareButton", "チェック分をお手入れ登録", Button_Click); batchActions.Children.Add(batchCare);
-        batchUse.Cursor = batchCare.Cursor = Cursors.Arrow;
-
+        batchUse.Cursor = batchCare.Cursor = view.CheckAllButton.Cursor = Cursors.Arrow;
+        foreach (var button in new[] { view.CheckAllButton, batchUse, batchCare, use, care, cancelCare }) button.Click += Button_Click;
+        saveEventButton.Click += EventButton_Click; deleteEventButton.Click += EventButton_Click;
 
         search.TextChanged += (_, _) => RefreshFilter();
         showUsed.Checked += (_, _) => RefreshFilter(); showUsed.Unchecked += (_, _) => RefreshFilter();
@@ -85,29 +84,8 @@ public sealed class DayWindow : ToolWindow
         grid.RowStyle = rowStyle;
         foreach (var row in rows) row.PropertyChanged += (_, _) => UpdateBatchStatus();
 
-        use = Ui.Button("UseButton", "使用", Button_Click); Actions.Children.Add(use);
-        care = Ui.Button("CareButton", "お手入れ", Button_Click); Actions.Children.Add(care);
-        cancelCare = Ui.Button("CancelCareButton", "お手入れ取消", Button_Click); Actions.Children.Add(cancelCare);
-        saveEventButton = Ui.Button("SaveCalendarEventButton", "予定を保存", EventButton_Click); saveEventButton.Style = (Style)FindResource("PrimaryButton"); saveEventButton.Visibility = Visibility.Collapsed; Actions.Children.Add(saveEventButton);
-        deleteEventButton = Ui.Button("DeleteCalendarEventButton", "予定を削除", EventButton_Click); deleteEventButton.Visibility = Visibility.Collapsed; deleteEventButton.IsEnabled = false; Actions.Children.Add(deleteEventButton);
-        var detail = new StackPanel { Margin = new Thickness(4, 8, 4, 0) };
-        var memoHeading = Ui.Text("お手入れメモ（表示のみ。編集は下部の「お手入れ」ボタン）", 12); memoHeading.FontWeight = FontWeights.SemiBold; memoHeading.Foreground = (Brush)FindResource("MutedBrush");
-        detail.Children.Add(status); detail.Children.Add(memoHeading); detail.Children.Add(memo);
-        tabs = new TabControl();
-        var recordTab = new TabItem { Header = "使用・お手入れ" };
-        var eventTab = new TabItem { Header = "予定" };
-        // Move the existing record controls into the original tab without changing their behavior.
-        var recordContent = new DockPanel { Cursor = Cursors.Arrow };
-        var recordTop = new StackPanel();
-        recordTop.Children.Add(Ui.Text("メーカー・モデル・色で検索")); recordTop.Children.Add(filters);
-        recordTop.Children.Add(batchActions); recordTop.Children.Add(batchStatus);
-        DockPanel.SetDock(recordTop, Dock.Top); recordContent.Children.Add(recordTop);
-        DockPanel.SetDock(detail, Dock.Bottom); recordContent.Children.Add(detail); recordContent.Children.Add(grid);
-        recordTab.Content = recordContent;
-        tabs.Items.Add(recordTab); tabs.Items.Add(eventTab);
-        BuildEventTab(eventTab);
+        BuildEventTab();
         tabs.SelectionChanged += (_, _) => UpdateActionMode();
-        AddTop(tabs);
         grid.SelectionChanged += (_, _) => UpdateSelection();
         grid.SelectedItem = rows.FirstOrDefault(x => x.Id == selected);
         Refresh();
@@ -121,58 +99,10 @@ public sealed class DayWindow : ToolWindow
         UpdateActionMode();
     }
 
-    private void BuildEventTab(TabItem tab)
+    private void BuildEventTab()
     {
-        var panel = new StackPanel { Margin = new Thickness(4) };
-        var heading = new DockPanel { Margin = new Thickness(2, 0, 2, 8) };
-        heading.Children.Add(Ui.Text("この日の予定", 16));
-        var count = Ui.Text("一覧から選ぶと編集できます", 12); count.Foreground = (Brush)FindResource("MutedBrush"); count.HorizontalAlignment = HorizontalAlignment.Right;
-        DockPanel.SetDock(count, Dock.Right); heading.Children.Add(count); panel.Children.Add(heading);
-        eventList.MaxHeight = 120; eventList.Margin = new Thickness(0, 0, 0, 14);
-        var dataTemplate = new DataTemplate(typeof(CalendarEvent));
-        var template = new FrameworkElementFactory(typeof(Border));
-        template.SetValue(Border.CornerRadiusProperty, new CornerRadius(9)); template.SetValue(Border.PaddingProperty, new Thickness(10, 7, 10, 7));
-        template.SetValue(Border.MarginProperty, new Thickness(2)); template.SetResourceReference(Border.BackgroundProperty, "CreamBrush");
-        var eventContent = new FrameworkElementFactory(typeof(DockPanel));
-        var time = new FrameworkElementFactory(typeof(TextBlock)); time.SetBinding(TextBlock.TextProperty, new Binding(nameof(CalendarEvent.Start)) { StringFormat = "HH:mm" });
-        time.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold); time.SetValue(TextBlock.ForegroundProperty, new DynamicResourceExtension("AccentBrush")); time.SetValue(FrameworkElement.MarginProperty, new Thickness(0, 0, 14, 0));
-        eventContent.AppendChild(time);
-        var title = new FrameworkElementFactory(typeof(TextBlock)); title.SetBinding(TextBlock.TextProperty, new Binding(nameof(CalendarEvent.Title))); title.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis); title.SetValue(TextBlock.FontWeightProperty, FontWeights.Medium);
-        eventContent.AppendChild(title); template.AppendChild(eventContent); dataTemplate.VisualTree = template; eventList.ItemTemplate = dataTemplate;
-        var itemStyle = new Style(typeof(ListBoxItem));
-        itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
-        itemStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0)));
-        itemStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-        var rowTemplate = new ControlTemplate(typeof(ListBoxItem));
-        var rowFrame = new FrameworkElementFactory(typeof(Border)); rowFrame.Name = "Frame";
-        rowFrame.SetValue(Border.CornerRadiusProperty, new CornerRadius(9)); rowFrame.SetValue(Border.PaddingProperty, new Thickness(2));
-        var rowPresenter = new FrameworkElementFactory(typeof(ContentPresenter)); rowPresenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
-        rowFrame.AppendChild(rowPresenter); rowTemplate.VisualTree = rowFrame;
-        var selectedTrigger = new Trigger { Property = ListBoxItem.IsSelectedProperty, Value = true };
-        selectedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("AccentSoftBrush"), "Frame"));
-        var hoverTrigger = new Trigger { Property = ListBoxItem.IsMouseOverProperty, Value = true };
-        hoverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, new DynamicResourceExtension("AccentSoftBrush"), "Frame"));
-        rowTemplate.Triggers.Add(selectedTrigger); rowTemplate.Triggers.Add(hoverTrigger);
-        itemStyle.Setters.Add(new Setter(Control.TemplateProperty, rowTemplate));
-        eventList.ItemContainerStyle = itemStyle;
-        panel.Children.Add(eventList);
         eventList.SelectionChanged += (_, _) => LoadSelectedEvent();
-        var card = new Border { CornerRadius = new CornerRadius(12), Padding = new Thickness(16), Background = (Brush)FindResource("SurfaceBrush"), BorderBrush = (Brush)FindResource("LineBrush"), BorderThickness = new Thickness(1) };
-        var form = new StackPanel(); card.Child = form;
-        eventFormHeading.Margin = new Thickness(0, 0, 0, 8); form.Children.Add(eventFormHeading);
-        AddEventField(form, "タイトル", eventTitle);
-        var dateTimes = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-        dateTimes.Children.Add(EventField("日付", eventDate, 155));
-        dateTimes.Children.Add(EventField("開始", eventStart, 108));
-        dateTimes.Children.Add(EventField("終了", eventEnd, 108)); form.Children.Add(dateTimes);
-        AddEventField(form, "繰り返し", recurrence);
-        recurrenceEndField = EventField("終了日（空欄は終了なし）", recurrenceEnd, 190); form.Children.Add(recurrenceEndField);
-        eventScopeField = EventField("適用範囲", eventScope); eventScopeField.Visibility = Visibility.Collapsed; form.Children.Add(eventScopeField);
-        AddEventField(form, "場所", eventLocation); AddEventField(form, "説明", eventDescription);
-        var notifyHeader = Ui.Text("通知タイミング", 12); notifyHeader.FontWeight = FontWeights.SemiBold; notifyHeader.Foreground = (Brush)FindResource("MutedBrush"); form.Children.Add(notifyHeader);
-        var notify = new WrapPanel { Margin = new Thickness(-3, 0, 0, 8) }; notify.Children.Add(notifyPrevious); notify.Children.Add(notify15); notify.Children.Add(notify5); form.Children.Add(notify);
-        panel.Children.Add(card);
-        tab.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Cursor = Cursors.Arrow };
+        eventList.Cursor = Cursors.Arrow;
         eventDate.SelectedDate = date;
         eventDate.Loaded += (_, _) =>
         {
@@ -187,15 +117,6 @@ public sealed class DayWindow : ToolWindow
         eventDate.SelectedDateChanged += (_, _) => UpdateEventActionState();
         recurrence.SelectionChanged += (_, _) => UpdateEventRecurrenceState();
         eventScope.SelectionChanged += (_, _) => UpdateEventScopeState();
-    }
-
-    private static void AddEventField(Panel panel, string label, Control control) => panel.Children.Add(EventField(label, control));
-    private static FrameworkElement EventField(string label, Control control, double? width = null)
-    {
-        if (width is { } value) control.Width = value;
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 18, 5) };
-        var caption = Ui.Text(label, 12); caption.FontWeight = FontWeights.SemiBold; caption.Foreground = (Brush)Application.Current.FindResource("MutedBrush");
-        stack.Children.Add(caption); stack.Children.Add(control); return stack;
     }
 
     private void RefreshEvents()

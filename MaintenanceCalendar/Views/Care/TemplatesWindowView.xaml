@@ -1,0 +1,23 @@
+<UserControl x:Class="MaintenanceCalendar.TemplatesWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="お手入れマスタ" FontSize="21" Margin="0,0,0,6"/>
+            <TextBlock Text="例：ブラッシング / 乾拭き（50文字まで）&#10;名前を変更する場合は新しい概要を登録し、旧概要を削除してください。" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <TextBox x:Name="Summary" MaxLength="50"/>
+            <CheckBox x:Name="ShowDeleted" Content="削除済みも表示" Margin="3,8,3,5"/>
+        </StackPanel>
+        <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button x:Name="SaveButton" Content="登録 / 復旧"/>
+            <Button x:Name="DeleteButton" Content="削除"/>
+            <Button x:Name="NewButton" Content="入力をクリア"/>
+        </WrapPanel>
+        <DataGrid x:Name="Grid">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="手入れ概要" Binding="{Binding Summary}" Width="*"/>
+                <DataGridTextColumn Header="状態" Binding="{Binding Status}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</UserControl>

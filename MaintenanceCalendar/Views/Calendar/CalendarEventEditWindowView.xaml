@@ -1,0 +1,22 @@
+<UserControl x:Class="MaintenanceCalendar.CalendarEventEditWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="4">
+            <TextBlock Text="タイトル"/><TextBox x:Name="Title" MinWidth="320"/>
+            <WrapPanel Margin="0,8,0,0">
+                <StackPanel Margin="0,0,14,4"><TextBlock Text="日付"/><DatePicker x:Name="Date" Width="170"/></StackPanel>
+                <StackPanel Margin="0,0,14,4"><TextBlock Text="開始"/><TextBox x:Name="StartTime" Width="105" Text="09:00"/></StackPanel>
+                <StackPanel Margin="0,0,14,4"><TextBlock Text="終了"/><TextBox x:Name="EndTime" Width="105" Text="10:00"/></StackPanel>
+            </WrapPanel>
+            <TextBlock Text="場所" Margin="0,8,0,0"/><TextBox x:Name="Location" MinWidth="240"/>
+            <TextBlock Text="説明" Margin="0,8,0,0"/><TextBox x:Name="Description" AcceptsReturn="True" TextWrapping="Wrap" Height="80" VerticalScrollBarVisibility="Auto"/>
+            <TextBlock Text="繰り返し" Margin="0,8,0,0"/><ComboBox x:Name="Recurrence" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+            <StackPanel x:Name="RecurrenceEndField" Margin="0,8,0,0">
+                <TextBlock Text="終了日（空欄は終了なし）"/><DatePicker x:Name="RecurrenceEnd" Width="190"/>
+            </StackPanel>
+            <TextBlock Text="通知タイミング" FontSize="13" Margin="0,8,0,0"/>
+            <WrapPanel><CheckBox x:Name="Previous" Content="前日" IsChecked="True"/><CheckBox x:Name="Fifteen" Content="15分前" IsChecked="True"/><CheckBox x:Name="Five" Content="5分前" IsChecked="True"/></WrapPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

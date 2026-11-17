@@ -1,0 +1,19 @@
+<UserControl x:Class="MaintenanceCalendar.ItemEditWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="4">
+            <TextBlock Text="メーカー（必須）"/><TextBox x:Name="Manufacturer" MaxLength="100"/>
+            <TextBlock Text="モデル（必須）" Margin="0,8,0,0"/><TextBox x:Name="Model" MaxLength="150"/>
+            <TextBlock Text="色" Margin="0,8,0,0"/><TextBox x:Name="Color" MaxLength="100"/>
+            <TextBlock x:Name="CatalogHelp" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,8"/>
+            <TextBlock Text="購入日（空欄可）"/><DatePicker x:Name="Purchase" DisplayDateStart="1900-01-01" DisplayDateEnd="9998-12-31"/>
+            <TextBlock Text="お手入れ間隔" Margin="0,8,0,0"/><ComboBox x:Name="Interval" DisplayMemberPath="Label" SelectedValuePath="Key"/>
+            <TextBlock Text="メモ" Margin="0,8,0,0"/><TextBox x:Name="Memo" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="70" MaxLength="20000"/>
+            <Border x:Name="PhotoDrop" BorderBrush="Tan" BorderThickness="1" Padding="12" AllowDrop="True" Margin="0,10,0,0">
+                <StackPanel><TextBlock x:Name="PhotoStatus" Text="写真をここにドロップ、または選択してください。"/><Image x:Name="Photo" MaxHeight="120" MaxWidth="160" Stretch="Uniform"/></StackPanel>
+            </Border>
+            <WrapPanel><Button x:Name="PhotoButton" Content="写真を選択"/><Button x:Name="ClearPhotoButton" Content="写真を外す"/></WrapPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

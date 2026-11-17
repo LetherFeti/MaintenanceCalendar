@@ -1,0 +1,36 @@
+<UserControl x:Class="MaintenanceCalendar.SettingsWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button x:Name="SaveButton" Content="設定を保存"/>
+            <Button x:Name="HolidayButton" Content="祝日取得"/>
+            <Button x:Name="CloseButton" Content="閉じる"/>
+            <TextBlock x:Name="HolidayStatus" VerticalAlignment="Center" TextWrapping="Wrap"/>
+        </WrapPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="見た目とデータ管理" FontSize="21"/>
+                <TextBlock Text="色は #RRGGBB 形式で入力してください。曜日・祝日の文字色は固定です。" TextWrapping="Wrap"/>
+                <TextBlock Text="テーマカラー"/><TextBox x:Name="ThemeColor" MaxLength="7"/>
+                <TextBlock Text="背景色"/><TextBox x:Name="BackgroundColor" MaxLength="7"/>
+                <TextBlock Text="今日"/><TextBox x:Name="TodayColor" MaxLength="7"/>
+                <TextBlock Text="使用"/><TextBox x:Name="UseColor" MaxLength="7"/>
+                <TextBlock Text="お手入れ"/><TextBox x:Name="CareColor" MaxLength="7"/>
+                <TextBlock Text="今日の図形"/><ComboBox x:Name="Shape"/>
+                <TextBlock Text="サイドバーの表示位置"/><ComboBox x:Name="SidebarPosition" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+                <TextBlock Text="ウィンドウ"/><CheckBox x:Name="ShowInTaskbar" Content="Alt＋Tab に表示する"/>
+                <TextBlock Text="毎月・毎年の予定で基準日がない場合" FontSize="14"/>
+                <TextBlock Text="例：毎月31日、2月29日"/><ComboBox x:Name="MissingRecurrenceDate" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+                <TextBlock Text="バックアップ / インポート" FontSize="18" Margin="0,10,0,0"/>
+                <TextBlock Text="DB・写真・設定をZIP保存します。停止中にZIPのDataフォルダをアプリフォルダへ展開しても復元できます。インポート直前のデータは別フォルダへ自動退避します。" TextWrapping="Wrap"/>
+                <WrapPanel><Button x:Name="BackupButton" Content="バックアップ"/><Button x:Name="ImportButton" Content="インポート"/></WrapPanel>
+                <TextBlock Text="スタートアップ" FontSize="18" Margin="0,10,0,0"/>
+                <WrapPanel><Button x:Name="StartupOnButton" Content="登録"/><Button x:Name="StartupOffButton" Content="解除"/></WrapPanel>
+                <TextBlock x:Name="StartupStatus" TextWrapping="Wrap"/>
+                <TextBlock x:Name="DataPath" TextWrapping="Wrap"/>
+                <TextBlock x:Name="OperationStatus" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

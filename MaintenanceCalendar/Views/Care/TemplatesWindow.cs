@@ -2,25 +2,22 @@ namespace MaintenanceCalendar;
 
 public sealed class TemplatesWindow : ToolWindow
 {
-    private readonly DataGrid grid = Ui.Grid(("手入れ概要", "Summary"), ("状態", "Status"));
-    private readonly TextBox summary = new() { MaxLength = 50 };
-    private readonly CheckBox all = new() { Content = "削除済みも表示" };
+    private readonly TemplatesWindowView view;
+    private DataGrid grid => view.Grid;
+    private TextBox summary => view.Summary;
+    private CheckBox all => view.ShowDeleted;
     /// <summary>
     /// 手入れ概要の入力欄・一覧・登録と削除の操作を構成します。
     /// </summary>
     public TemplatesWindow() : base("お手入れマスタ", 550, 480)
     {
-        AddTop(Ui.Text("お手入れマスタ", 21));
-
-        AddTop(Ui.Text("例：ブラッシング / 乾拭き（50文字まで）\n名前を変更する場合は新しい概要を登録し、旧概要を削除してください。"));
-
-        AddTop(summary); AddTop(all); Root.Children.Add(grid);
+        view = new TemplatesWindowView(); Root.Children.Add(view);
 
         all.Checked += (_, _) => Ui.Run(Refresh); all.Unchecked += (_, _) => Ui.Run(Refresh);
 
         grid.SelectionChanged += (_, _) => { if (grid.SelectedItem is TemplateRow row) summary.Text = row.Summary; };
 
-        AddButton("SaveButton", "登録 / 復旧", Button_Click); AddButton("DeleteButton", "削除", Button_Click); AddButton("NewButton", "入力をクリア", Button_Click);
+        view.SaveButton.Click += Button_Click; view.DeleteButton.Click += Button_Click; view.NewButton.Click += Button_Click;
 
         Refresh();
     }

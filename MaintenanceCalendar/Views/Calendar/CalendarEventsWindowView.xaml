@@ -1,0 +1,19 @@
+<UserControl x:Class="MaintenanceCalendar.CalendarEventsWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="予定一覧" FontSize="21" Margin="0,0,0,6"/>
+            <TextBlock Text="定期予定はシリーズ単位で管理します。カレンダーから開催回ごとの編集・取り消しもできます。" TextWrapping="Wrap"/>
+        </StackPanel>
+        <DataGrid x:Name="Grid" Margin="0,8">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="予定" Binding="{Binding Title}" Width="2*"/>
+                <DataGridTextColumn Header="開始" Binding="{Binding Start, StringFormat=yyyy/MM/dd HH:mm}" Width="*"/>
+                <DataGridTextColumn Header="繰り返し" Binding="{Binding RecurrenceLabel}" Width="*"/>
+                <DataGridTextColumn Header="終了日" Binding="{Binding RecurrenceEnd, StringFormat=yyyy/MM/dd}" Width="*"/>
+                <DataGridTextColumn Header="場所" Binding="{Binding Location}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</UserControl>

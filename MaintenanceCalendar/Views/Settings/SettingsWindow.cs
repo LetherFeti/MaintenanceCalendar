@@ -5,23 +5,14 @@ namespace MaintenanceCalendar;
 public sealed class SettingsWindow : ToolWindow
 {
     private readonly Dictionary<string, TextBox> colors = [];
-    private readonly ComboBox shape = new() { ItemsSource = new[] { "●", "■", "▼" } };
-    private readonly ComboBox missingRecurrenceDate = new()
-    {
-        DisplayMemberPath = "Value",
-        SelectedValuePath = "Key",
-        ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" }
-    };
-    private readonly CheckBox showInTaskbar = new() { Content = "Alt＋Tab に表示する" };
-    private readonly ComboBox sidebarPosition = new()
-    {
-        DisplayMemberPath = "Value",
-        SelectedValuePath = "Key",
-        ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" }
-    };
-    private readonly TextBlock holidayStatus = Ui.Text("");
-    private readonly TextBlock startupStatus = Ui.Text("");
-    private readonly TextBlock operationStatus = Ui.Text("");
+    private readonly SettingsWindowView view;
+    private ComboBox shape => view.Shape;
+    private ComboBox missingRecurrenceDate => view.MissingRecurrenceDate;
+    private CheckBox showInTaskbar => view.ShowInTaskbar;
+    private ComboBox sidebarPosition => view.SidebarPosition;
+    private TextBlock holidayStatus => view.HolidayStatus;
+    private TextBlock startupStatus => view.StartupStatus;
+    private TextBlock operationStatus => view.OperationStatus;
     private bool busy;
     private bool closingAfterImport;
     /// <summary>
@@ -29,48 +20,22 @@ public sealed class SettingsWindow : ToolWindow
     /// </summary>
     public SettingsWindow() : base("設定", 590, 730)
     {
-        var panel = new StackPanel(); Root.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
-
-        panel.Children.Add(Ui.Text("見た目とデータ管理", 21));
-
-        panel.Children.Add(Ui.Text("色は #RRGGBB 形式で入力してください。曜日・祝日の文字色は固定です。"));
-
-        // 色設定の入力欄を登録し、ラベルとともに設定画面へ追加します。
-        void ColorField(string key, string label, string value)
-        {
-            var text = new TextBox { Text = value, MaxLength = 7 }; colors[key] = text; Ui.Field(panel, label, text);
-        }
+        view = new SettingsWindowView(); Root.Children.Add(view);
+        colors["Theme"] = view.ThemeColor; colors["Background"] = view.BackgroundColor;
+        colors["Today"] = view.TodayColor; colors["Use"] = view.UseColor; colors["Care"] = view.CareColor;
+        shape.ItemsSource = new[] { "●", "■", "▼" };
+        missingRecurrenceDate.ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" };
+        sidebarPosition.ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" };
+        foreach (var button in new[] { view.SaveButton, view.HolidayButton, view.CloseButton, view.BackupButton, view.ImportButton, view.StartupOnButton, view.StartupOffButton }) button.Click += Button_Click;
         var settings = Services.Settings;
+        colors["Theme"].Text = settings.ThemeColor; colors["Background"].Text = settings.BackgroundColor;
+        colors["Today"].Text = settings.TodayColor; colors["Use"].Text = settings.UseColor; colors["Care"].Text = settings.CareColor;
 
-        ColorField("Theme", "テーマカラー", settings.ThemeColor); ColorField("Background", "背景色", settings.BackgroundColor);
-
-        ColorField("Today", "今日", settings.TodayColor); ColorField("Use", "使用", settings.UseColor); ColorField("Care", "お手入れ", settings.CareColor);
-
-        shape.SelectedItem = settings.TodayShape; Ui.Field(panel, "今日の図形", shape);
+        shape.SelectedItem = settings.TodayShape;
         sidebarPosition.SelectedValue = settings.SidebarPosition;
-        Ui.Field(panel, "サイドバーの表示位置", sidebarPosition);
         showInTaskbar.IsChecked = settings.ShowInTaskbar;
-        Ui.Field(panel, "ウィンドウ", showInTaskbar);
         missingRecurrenceDate.SelectedValue = settings.MissingRecurrenceDateBehavior;
-        panel.Children.Add(Ui.Text("毎月・毎年の予定で基準日がない場合", 14));
-        Ui.Field(panel, "例：毎月31日、2月29日", missingRecurrenceDate);
-
-        Actions.Children.Add(Ui.Button("SaveButton", "設定を保存", Button_Click));
-        Actions.Children.Add(Ui.Button("HolidayButton", "祝日取得", Button_Click));
-        Actions.Children.Add(Ui.Button("CloseButton", "閉じる", Button_Click));
-        Actions.Children.Add(holidayStatus);
-
-        panel.Children.Add(Ui.Text("バックアップ / インポート", 18));
-
-        panel.Children.Add(Ui.Text("DB・写真・設定をZIP保存します。停止中にZIPのDataフォルダをアプリフォルダへ展開しても復元できます。インポート直前のデータは別フォルダへ自動退避します。"));
-
-        var backup = new WrapPanel(); backup.Children.Add(Ui.Button("BackupButton", "バックアップ", Button_Click)); backup.Children.Add(Ui.Button("ImportButton", "インポート", Button_Click)); panel.Children.Add(backup);
-
-        panel.Children.Add(Ui.Text("スタートアップ", 18));
-
-        var startup = new WrapPanel(); startup.Children.Add(Ui.Button("StartupOnButton", "登録", Button_Click)); startup.Children.Add(Ui.Button("StartupOffButton", "解除", Button_Click)); panel.Children.Add(startup); panel.Children.Add(startupStatus);
-
-        panel.Children.Add(Ui.Text("保存先：" + Services.Data)); panel.Children.Add(operationStatus);
+        view.DataPath.Text = "保存先：" + Services.Data;
 
         AddDirtyTracking(); UpdateStatus();
 

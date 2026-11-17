@@ -1,38 +1,22 @@
 using Microsoft.Win32;
-using System.Windows.Data;
 
 namespace MaintenanceCalendar;
 
 public sealed class ItemsWindow : ToolWindow
 {
-    private readonly DataGrid grid = Ui.Grid(("メーカー", "Manufacturer"), ("モデル", "Model"), ("色", "Color"),
-        ("購入日", "PurchaseDate"), ("間隔", "IntervalLabel"), ("状態", "Status"));
-
-    private readonly CheckBox includeDeleted = new() { Content = "削除済みも表示", Margin = new Thickness(3, 8, 3, 5) };
+    private readonly ItemsWindowView view;
+    private DataGrid grid => view.Grid;
+    private CheckBox includeDeleted => view.IncludeDeleted;
 
     /// <summary>
     /// 所持品一覧と選択用チェック欄、登録・編集・削除・復旧の操作を構成します。
     /// </summary>
     public ItemsWindow() : base("所持品マスタ", 920, 570)
     {
-        AddTop(Ui.Text("所持品マスタ", 21)); AddTop(Ui.Text("行を選んで編集・コピー。チェックした行はまとめて削除・復旧できます。"));
-
-        AddTop(includeDeleted); includeDeleted.Checked += (_, _) => Ui.Run(Refresh); includeDeleted.Unchecked += (_, _) => Ui.Run(Refresh);
-
-        grid.IsReadOnly = false;
-
-        foreach (var c in grid.Columns) c.IsReadOnly = true;
-        grid.Columns.Insert(0, new DataGridCheckBoxColumn { Header = "選択", Binding = new Binding("IsChecked") { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = DataGridLength.Auto });
-
-        ((DataGridTextColumn)grid.Columns[4]).Binding.StringFormat = "yyyy/MM/dd";
-
-        Root.Children.Add(grid);
-
-        AddButton("AddButton", "追加", Button_Click); AddButton("EditButton", "編集", Button_Click);
-
-        AddButton("CopyButton", "コピー", Button_Click); AddButton("DeleteButton", "削除", Button_Click);
-
-        AddButton("RestoreButton", "削除解除", Button_Click); AddButton("CheckAllButton", "全選択 / 解除", Button_Click);
+        view = new ItemsWindowView();
+        Root.Children.Add(view);
+        includeDeleted.Checked += (_, _) => Ui.Run(Refresh); includeDeleted.Unchecked += (_, _) => Ui.Run(Refresh);
+        foreach (var button in new[] { view.AddButton, view.EditButton, view.CopyButton, view.DeleteButton, view.RestoreButton, view.CheckAllButton }) button.Click += Button_Click;
 
         Refresh();
     }

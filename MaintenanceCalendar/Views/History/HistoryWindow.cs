@@ -2,11 +2,12 @@ namespace MaintenanceCalendar;
 
 public sealed class HistoryWindow : ToolWindow
 {
-    private readonly ComboBox combo;
-    private readonly TextBlock last = Ui.Text("");
-    private readonly TextBlock pageText = Ui.Text("");
-    private readonly TextBox memo = new() { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, MaxHeight = 90, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-    private readonly DataGrid grid = Ui.Grid(("日付", "Date"), ("作業", "WorkLabel"), ("お手入れメモ", "Memo"));
+    private readonly HistoryWindowView view;
+    private ComboBox combo => view.ItemCombo;
+    private TextBlock last => view.LastText;
+    private TextBlock pageText => view.PageText;
+    private TextBox memo => view.Memo;
+    private DataGrid grid => view.Grid;
     private int page;
     private const int PageSize = 200;
     private readonly Button previous, next;
@@ -16,20 +17,18 @@ public sealed class HistoryWindow : ToolWindow
     /// </summary>
     public HistoryWindow(long? selected = null) : base("使用・手入れ履歴", 820, 560)
     {
-        AddTop(Ui.Text("使用・手入れ履歴", 21));
+        view = new HistoryWindowView(); Root.Children.Add(view);
 
         var items = Services.Db.GetItems(true);
 
-        combo = Ui.ItemCombo(items, selected);
+        var choices = new List<Item> { new() }; choices.AddRange(items);
+        combo.ItemsSource = choices;
+        combo.DisplayMemberPath = "DisplayName";
+        combo.SelectedValuePath = "Id";
+        combo.SelectedValue = selected ?? 0L;
 
         // Deleted items remain readable without reappearing in the main calendar.
         foreach (var item in items.Where(x => x.IsDeleted)) item.Model += "（削除済み）";
-
-        AddTop(combo); AddTop(last); AddTop(pageText);
-
-        DockPanel.SetDock(memo, Dock.Bottom); Root.Children.Add(memo); Root.Children.Add(grid);
-
-        ((DataGridTextColumn)grid.Columns[0]).Binding.StringFormat = "yyyy/MM/dd";
 
         previous = Ui.Button("PreviousButton", "前へ", Button_Click); Actions.Children.Add(previous);
 

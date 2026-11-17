@@ -2,22 +2,19 @@ namespace MaintenanceCalendar;
 
 public sealed class CareMemoWindow : ToolWindow
 {
-    private readonly TextBox memo = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxLength = 20000 };
-    private readonly ListBox templates = new() { SelectionMode = SelectionMode.Multiple, DisplayMemberPath = "Summary", MaxHeight = 140 };
+    private readonly CareMemoWindowView view;
+    private TextBox memo => view.Memo;
+    private ListBox templates => view.Templates;
     public string Memo => memo.Text;
     /// <summary>
     /// 定型語句の一覧と初期メモを読み込み、追記・記録・キャンセル操作を設定します。
     /// </summary>
     public CareMemoWindow(string initial) : base("お手入れメモ", 500, 530)
     {
-        AddTop(Ui.Text("マスタから複数選択して追加できます。自由に追記・編集できます。"));
-
-        templates.ItemsSource = Services.Db.Templates(); AddTop(templates);
-
-        AddTop(Ui.Button("AppendButton", "選択した内容をメモに追加", Button_Click));
-
-        memo.Text = initial; Root.Children.Add(memo);
-
+        view = new CareMemoWindowView(); Root.Children.Add(view);
+        templates.ItemsSource = Services.Db.Templates();
+        view.AppendButton.Click += Button_Click;
+        memo.Text = initial;
         AddButton("SaveButton", "記録", Button_Click); AddButton("CancelButton", "キャンセル", Button_Click);
     }
     /// <summary>

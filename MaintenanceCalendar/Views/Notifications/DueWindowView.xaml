@@ -1,0 +1,33 @@
+<UserControl x:Class="MaintenanceCalendar.DueWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,0,8">
+            <TextBlock x:Name="EventsHeading" FontSize="20"/>
+            <ItemsControl x:Name="EventsList" Margin="0,0,0,10">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border CornerRadius="8" Padding="10,7" Margin="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1">
+                            <DockPanel>
+                                <TextBlock Text="{Binding Start, StringFormat=HH:mm}" FontWeight="SemiBold" Margin="0,0,12,0" Foreground="{DynamicResource AccentBrush}"/>
+                                <TextBlock Text="{Binding Location}" DockPanel.Dock="Right" Margin="12,0,0,0" Foreground="{DynamicResource MutedBrush}"/>
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+                            </DockPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="EmptyEvents" Text="今日の予定はありません。"/>
+            <TextBlock x:Name="DueHeading" FontSize="20" Margin="0,8,0,0"/>
+            <TextBlock Text="未手入れの場合は購入日、購入日がなければ登録日を基準にしています。" TextWrapping="Wrap"/>
+            <DataGrid x:Name="Grid" MinHeight="160" MaxHeight="280" Margin="0,8">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="所持品" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="最終お手入れ" Binding="{Binding LastCareText}" Width="*"/>
+                    <DataGridTextColumn Header="基準日" Binding="{Binding BaseText}" Width="*"/>
+                    <DataGridTextColumn Header="お手入れ期限" Binding="{Binding DueText}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -15,26 +15,19 @@ public sealed class EventNotificationWindow : Window
         ShowActivated = false; Topmost = true; WindowStartupLocation = WindowStartupLocation.Manual;
         Cursor = System.Windows.Input.Cursors.Arrow;
 
-        var card = new Border
-        {
-            CornerRadius = new CornerRadius(16),
-            Padding = new Thickness(20),
-            Margin = new Thickness(12),
-            Background = (Brush)Application.Current.FindResource("CreamBrush"),
-            BorderBrush = (Brush)Application.Current.FindResource("AccentBrush"),
-            BorderThickness = new Thickness(2)
-        };
-        var content = new StackPanel(); card.Child = content;
-        var title = Ui.Text(heading, 13); title.Foreground = (Brush)FindResource("AccentBrush"); title.FontWeight = FontWeights.SemiBold; content.Children.Add(title);
-        var eventTitle = Ui.Text(entry.Title, 20); eventTitle.FontWeight = FontWeights.Bold; content.Children.Add(eventTitle);
-        content.Children.Add(Ui.Text($"{entry.Start:yyyy年M月d日（ddd）}　{entry.Start:HH:mm}～{entry.End:HH:mm}", 14));
-        if (!string.IsNullOrWhiteSpace(entry.Location)) content.Children.Add(Ui.Text(entry.Location, 13));
-        if (!string.IsNullOrWhiteSpace(entry.Description)) content.Children.Add(Ui.Text(entry.Description, 13));
-        if (!string.IsNullOrWhiteSpace(timing)) content.Children.Add(Ui.Text(timing, 12));
-        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
-        var acknowledge = Ui.Button("AcknowledgeEventButton", "OK", (_, _) => Complete(false)); acknowledge.Style = (Style)FindResource("PrimaryButton"); actions.Children.Add(acknowledge);
-        actions.Children.Add(Ui.Button("SuppressEventNotificationsButton", "以降、この予定を通知しない", (_, _) => Complete(true)));
-        content.Children.Add(actions); Content = card;
+        var view = new EventNotificationWindowView();
+        view.Heading.Text = heading;
+        view.EventTitle.Text = entry.Title;
+        view.WhenText.Text = $"{entry.Start:yyyy年M月d日（ddd）}　{entry.Start:HH:mm}～{entry.End:HH:mm}";
+        view.LocationText.Text = entry.Location;
+        view.LocationText.Visibility = string.IsNullOrWhiteSpace(entry.Location) ? Visibility.Collapsed : Visibility.Visible;
+        view.DescriptionText.Text = entry.Description;
+        view.DescriptionText.Visibility = string.IsNullOrWhiteSpace(entry.Description) ? Visibility.Collapsed : Visibility.Visible;
+        view.TimingText.Text = timing;
+        view.TimingText.Visibility = string.IsNullOrWhiteSpace(timing) ? Visibility.Collapsed : Visibility.Visible;
+        view.AcknowledgeButton.Click += (_, _) => Complete(false);
+        view.SuppressButton.Click += (_, _) => Complete(true);
+        Content = view;
         Loaded += (_, _) => PositionAtBottomRight();
         Closing += (_, _) => Complete(false);
     }

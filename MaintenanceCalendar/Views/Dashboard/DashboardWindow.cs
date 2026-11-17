@@ -7,20 +7,16 @@ public sealed class DashboardWindow : ToolWindow
     /// <summary>従来と同じ有効品・使用回数・購入日・期限の集計をカードと円グラフで表示します。</summary>
     public DashboardWindow() : base("ダッシュボード", 660, 510)
     {
-        var panel = new StackPanel();
-        Root.Children.Add(new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
-        panel.Children.Add(Ui.Text("所持品のダッシュボード", 23));
-        panel.Children.Add(Muted("お気に入りと過ごした日々を、ひと目で。削除済みの所持品は含みません。"));
+        var view = new DashboardWindowView(); Root.Children.Add(view);
         var items = Services.Db.GetItems().ToDictionary(x => x.Id);
         var usage = Services.Db.UsageCounts();
         int due = Services.Db.Due(DateTime.Today).Count;
         long total = usage.Sum(x => x.Count);
-        var metrics = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(0, 6, 0, 8) };
+        var metrics = view.Metrics;
         metrics.Children.Add(Metric("登録中", $"{items.Count:N0}", "点"));
         metrics.Children.Add(Metric("使用記録", $"{total:N0}", "回"));
         metrics.Children.Add(Metric("期限到来", $"{due:N0}", "点"));
-        panel.Children.Add(metrics);
-        var cards = new Grid(); panel.Children.Add(cards);
+        var cards = view.Cards;
         var duePanel = new StackPanel();
         duePanel.Children.Add(Ui.Text("お手入れのタイミング", 16));
         double rate = items.Count == 0 ? 0 : (double)due / items.Count;

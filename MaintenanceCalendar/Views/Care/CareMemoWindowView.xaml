@@ -1,0 +1,12 @@
+<UserControl x:Class="MaintenanceCalendar.CareMemoWindowView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top">
+            <TextBlock Text="マスタから複数選択して追加できます。自由に追記・編集できます。" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <ListBox x:Name="Templates" SelectionMode="Multiple" DisplayMemberPath="Summary" MaxHeight="140"/>
+            <Button x:Name="AppendButton" Content="選択した内容をメモに追加" HorizontalAlignment="Left" Margin="0,8,0,8"/>
+        </StackPanel>
+        <TextBox x:Name="Memo" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="20000"/>
+    </DockPanel>
+</UserControl>
