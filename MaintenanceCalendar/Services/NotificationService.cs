@@ -8,6 +8,7 @@ public sealed class NotificationService : IDisposable
     private readonly System.Windows.Forms.NotifyIcon icon;
     private readonly System.Windows.Threading.DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(8) };
     private readonly System.Windows.Threading.DispatcherTimer eventTimer = new() { Interval = TimeSpan.FromSeconds(15) };
+    private readonly System.Windows.Threading.DispatcherTimer startupDelay = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly Queue<string> messages = new();
     private readonly Queue<PendingEventNotification> eventMessages = new();
     private readonly HashSet<string> pendingEventKeys = [];
@@ -15,9 +16,15 @@ public sealed class NotificationService : IDisposable
     private readonly System.Windows.Forms.ContextMenuStrip trayMenu = new();
     private WindowState restoreState = WindowState.Normal;
     private bool restoring;
+    private bool startupDelayElapsed;
     private EventNotificationWindow? activeEventWindow;
     private DateTime lastPrunedDate = DateTime.MinValue;
-    private sealed record PendingEventNotification(CalendarEvent Event, string Heading, string Timing, int DueMask, bool Startup);
+    // Reminder masks use bits 1, 2, and 4; bit 8 records the one-time startup notice for today's occurrence.
+    private const int StartupEventNotificationMask = 8;
+    private sealed record PendingEventNotification(CalendarEvent Event, string Heading, string Timing, int DueMask, DateTime? StartupDate)
+    {
+        public bool Startup => StartupDate.HasValue;
+    }
     private enum UserNotificationState { NotPresent = 1, Busy = 2, Fullscreen3D = 3, Presentation = 4, AcceptsNotifications = 5, QuietTime = 6, App = 7 }
     [DllImport("shell32.dll", PreserveSig = true)] private static extern int SHQueryUserNotificationState(out UserNotificationState state);
     /// <summary>
@@ -46,6 +53,12 @@ public sealed class NotificationService : IDisposable
         icon.DoubleClick += (_, _) => owner.Dispatcher.Invoke(Restore);
         timer.Tick += (_, _) => DisplayNext();
         eventTimer.Tick += (_, _) => CheckCalendarEvents();
+        startupDelay.Tick += (_, _) =>
+        {
+            startupDelay.Stop(); startupDelayElapsed = true;
+            CheckCalendarEvents(); ShowNextEventWindow();
+        };
+        startupDelay.Start();
         eventTimer.Start();
     }
 
@@ -101,6 +114,7 @@ public sealed class NotificationService : IDisposable
         LogManager.GetCurrentClassLogger().Info("Startup notifications due={0}", due.Count);
         if (due.Count >= 3) messages.Enqueue($"お手入れが必要なアイテムが複数あります（{due.Count}件）。\nアプリの「通知」で確認してください。");
         else foreach (var item in due) messages.Enqueue("お手入れが必要なアイテムがあります\n" + item.Name);
+        EnqueueStartupEvents(DateTime.Today, "今日の予定");
         EnqueueTomorrowEvents();
         DisplayNext(); if (messages.Count > 0) timer.Start();
         CheckCalendarEvents();
@@ -109,6 +123,7 @@ public sealed class NotificationService : IDisposable
     public void OnDateChanged()
     {
         PruneExpiredEventState();
+        if (!startupDelayElapsed) EnqueueStartupEvents(DateTime.Today, "今日の予定");
         EnqueueTomorrowEvents();
         ShowNextEventWindow();
         CheckCalendarEvents();
@@ -116,8 +131,17 @@ public sealed class NotificationService : IDisposable
 
     private void EnqueueTomorrowEvents()
     {
-        var tomorrow = AppServices.Current.Db.Events(DateTime.Today.AddDays(1), DateTime.Today.AddDays(2), AppServices.Current.Settings.MissingRecurrenceDateBehavior);
-        foreach (var entry in tomorrow.Where(x => !x.NotificationsSuppressed)) EnqueueEvent(new(entry, "明日の予定", "", 0, true));
+        EnqueueStartupEvents(DateTime.Today.AddDays(1), "明日の予定");
+    }
+
+    private void EnqueueStartupEvents(DateTime day, string heading)
+    {
+        var events = AppServices.Current.Db.Events(day.Date, day.Date.AddDays(1), AppServices.Current.Settings.MissingRecurrenceDateBehavior);
+        foreach (var entry in events.Where(x => !x.NotificationsSuppressed && x.End > DateTime.Now))
+        {
+            if (day.Date == DateTime.Today && (entry.NotificationMask & StartupEventNotificationMask) != 0) continue;
+            EnqueueEvent(new(entry, heading, "", 0, day.Date));
+        }
     }
     /// <summary>通知可能な状態なら、予定の通知時刻を確認して独立ウィンドウを表示します。</summary>
     private void CheckCalendarEvents()
@@ -127,7 +151,10 @@ public sealed class NotificationService : IDisposable
             PruneExpiredEventState();
             if (!AcceptsNotificationUi()) return;
             foreach (var candidate in AppServices.Current.Db.EventNotificationsDue(DateTime.Now, AppServices.Current.Settings.MissingRecurrenceDateBehavior))
-                EnqueueEvent(new(candidate.Event, "予定のお知らせ", candidate.Timing, candidate.DueMask, false));
+            {
+                if (pendingEventKeys.Contains(EventKey(candidate.Event) + ":startup")) continue;
+                EnqueueEvent(new(candidate.Event, "予定のお知らせ", candidate.Timing, candidate.DueMask, null));
+            }
             ShowNextEventWindow();
         }
         catch (Exception ex) { LogManager.GetCurrentClassLogger().Warn(ex, "Calendar event notification check failed"); }
@@ -155,15 +182,20 @@ public sealed class NotificationService : IDisposable
 
     private void ShowNextEventWindow()
     {
-        if (activeEventWindow is not null || eventMessages.Count == 0 || !AcceptsNotificationUi()) return;
+        if (!startupDelayElapsed || activeEventWindow is not null || eventMessages.Count == 0 || !AcceptsNotificationUi()) return;
         while (eventMessages.TryDequeue(out var pending))
         {
             string occurrenceKey = EventKey(pending.Event);
             string queuedKey = occurrenceKey + (pending.Startup ? ":startup" : ":" + pending.Timing);
-            if (pending.Startup && pending.Event.Start.Date != DateTime.Today.AddDays(1)) { pendingEventKeys.Remove(queuedKey); continue; }
+            if (pending.StartupDate is { } startupDate)
+            {
+                DateTime expectedDate = pending.Heading == "今日の予定" ? DateTime.Today : DateTime.Today.AddDays(1);
+                if (startupDate.Date != expectedDate || pending.Event.Start.Date != expectedDate)
+                { pendingEventKeys.Remove(queuedKey); continue; }
+            }
             var current = AppServices.Current.Db.Events(pending.Event.Start.Date, pending.Event.Start.Date.AddDays(1), AppServices.Current.Settings.MissingRecurrenceDateBehavior)
                 .FirstOrDefault(x => x.Id == pending.Event.Id && x.OriginalStart == pending.Event.OriginalStart);
-            if (current is null || current.NotificationsSuppressed) { pendingEventKeys.Remove(queuedKey); continue; }
+            if (current is null || current.NotificationsSuppressed || pending.Startup && current.End <= DateTime.Now) { pendingEventKeys.Remove(queuedKey); continue; }
             if (!pending.Startup)
             {
                 var latest = AppServices.Current.Db.EventNotificationsDue(DateTime.Now, AppServices.Current.Settings.MissingRecurrenceDateBehavior)
@@ -188,7 +220,19 @@ public sealed class NotificationService : IDisposable
                 owner.Dispatcher.BeginInvoke(ShowNextEventWindow);
             };
             window.Show();
-            if (!pending.Startup) AppServices.Current.Db.MarkEventReminderDisplayed(current, pending.DueMask);
+            if (pending.Heading == "今日の予定")
+            {
+                int dueMask = AppServices.Current.Db.EventNotificationsDue(DateTime.Now, AppServices.Current.Settings.MissingRecurrenceDateBehavior)
+                    .FirstOrDefault(x => EventKey(x.Event) == occurrenceKey)?.DueMask ?? 0;
+                AppServices.Current.Db.MarkEventReminderDisplayed(current, StartupEventNotificationMask | dueMask);
+            }
+            else if (pending.StartupDate.HasValue)
+            {
+                int dueMask = AppServices.Current.Db.EventNotificationsDue(DateTime.Now, AppServices.Current.Settings.MissingRecurrenceDateBehavior)
+                    .FirstOrDefault(x => EventKey(x.Event) == occurrenceKey)?.DueMask ?? 0;
+                if (dueMask != 0) AppServices.Current.Db.MarkEventReminderDisplayed(current, dueMask);
+            }
+            else AppServices.Current.Db.MarkEventReminderDisplayed(current, pending.DueMask);
             return;
         }
     }
@@ -212,5 +256,5 @@ public sealed class NotificationService : IDisposable
     /// <summary>
     /// 通知タイマーを停止し、通知アイコンを非表示にしてリソースを解放します。
     /// </summary>
-    public void Dispose() { owner.StateChanged -= Owner_StateChanged; timer.Stop(); eventTimer.Stop(); activeEventWindow?.Close(); icon.Visible = false; icon.Dispose(); trayMenu.Dispose(); }
+    public void Dispose() { owner.StateChanged -= Owner_StateChanged; timer.Stop(); eventTimer.Stop(); startupDelay.Stop(); activeEventWindow?.Close(); icon.Visible = false; icon.Dispose(); trayMenu.Dispose(); }
 }
