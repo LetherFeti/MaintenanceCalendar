@@ -107,7 +107,9 @@ public sealed class SettingsWindow : ToolWindow
                         WindowTop = Services.Settings.WindowTop,
                         WindowWidth = Services.Settings.WindowWidth,
                         WindowHeight = Services.Settings.WindowHeight,
-                        HolidayFetchedAt = Services.Settings.HolidayFetchedAt
+                        HolidayFetchedAt = Services.Settings.HolidayFetchedAt,
+                        CalendarView = Services.Settings.CalendarView,
+                        WeekScrollOffset = Services.Settings.WeekScrollOffset
                     };
                     s.Save(Services.SettingsPath); Services.Settings = s; s.Apply();
                     foreach (Window window in Application.Current.Windows)
