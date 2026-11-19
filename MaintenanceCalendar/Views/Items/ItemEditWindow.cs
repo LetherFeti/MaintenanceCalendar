@@ -6,6 +6,7 @@ public sealed class ItemEditWindow : ToolWindow
 {
     private readonly Item item;
     private readonly ItemEditWindowView view;
+    private readonly IntervalViewModel vm = new();
     private TextBox manufacturer => view.Manufacturer;
     private TextBox model => view.Model;
     private TextBox color => view.Color;
@@ -24,12 +25,12 @@ public sealed class ItemEditWindow : ToolWindow
     public ItemEditWindow(Item item) : base(item.Id == 0 ? "所持品の登録" : "所持品の編集", 510, 760)
     {
         this.item = item;
-        view = new ItemEditWindowView(); Root.Children.Add(view);
-        interval.ItemsSource = Intervals.All;
+        view = new ItemEditWindowView(); view.DataContext = vm; Root.Children.Add(view);
+        vm.Options = Intervals.All; vm.SelectedValue = item.IntervalKey;
 
         manufacturer.Text = item.Manufacturer; model.Text = item.Model; color.Text = item.Color;
 
-        purchase.SelectedDate = item.PurchaseDate; interval.SelectedValue = item.IntervalKey; memo.Text = item.Memo;
+        purchase.SelectedDate = item.PurchaseDate; memo.Text = item.Memo;
 
         var catalog = new ItemCatalog(ItemCatalog.FilePath);
         manufacturerSuggestions = new InputSuggestions(manufacturer, catalog.Manufacturers);
@@ -77,7 +78,7 @@ public sealed class ItemEditWindow : ToolWindow
             case "SaveButton":
                 if (string.IsNullOrWhiteSpace(manufacturer.Text) || string.IsNullOrWhiteSpace(model.Text)) { MessageBox.Show("メーカーとモデルを入力してください。"); return; }
                 item.Manufacturer = manufacturer.Text.Trim(); item.Model = model.Text.Trim(); item.Color = color.Text;
-                item.PurchaseDate = purchase.SelectedDate; item.IntervalKey = (string)interval.SelectedValue; item.Memo = memo.Text;
+                item.PurchaseDate = purchase.SelectedDate; item.IntervalKey = (string)vm.SelectedValue!; item.Memo = memo.Text;
                 if (pendingPhoto is not null) item.Photo = Services.ImportPhoto(pendingPhoto); else if (clearPhoto) item.Photo = null;
                 Services.Db.SaveItem(item); DialogResult = true; break;
             case "CancelButton": DialogResult = false; break;

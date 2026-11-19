@@ -5,6 +5,7 @@ namespace MaintenanceCalendar;
 public sealed class ItemsWindow : ToolWindow
 {
     private readonly ItemsWindowView view;
+    private readonly ItemsViewModel vm = new();
     private DataGrid grid => view.Grid;
     private CheckBox includeDeleted => view.IncludeDeleted;
 
@@ -14,6 +15,7 @@ public sealed class ItemsWindow : ToolWindow
     public ItemsWindow() : base("所持品マスタ", 920, 570)
     {
         view = new ItemsWindowView();
+        view.DataContext = vm;
         Root.Children.Add(view);
         includeDeleted.Checked += (_, _) => Ui.Run(Refresh); includeDeleted.Unchecked += (_, _) => Ui.Run(Refresh);
         foreach (var button in new[] { view.AddButton, view.EditButton, view.CopyButton, view.DeleteButton, view.RestoreButton, view.CheckAllButton }) button.Click += Button_Click;
@@ -25,8 +27,9 @@ public sealed class ItemsWindow : ToolWindow
     /// </summary>
     private void Refresh()
     {
-        var items = Services.Db.GetItems(includeDeleted.IsChecked == true);
-        grid.ItemsSource = includeDeleted.IsChecked == true ? items.Where(x => x.IsDeleted).ToList() : items;
+        vm.SelectedItem = null;
+        var items = Services.Db.GetItems(vm.ShowDeletedOnly);
+        vm.Items = vm.ShowDeletedOnly ? items.Where(x => x.IsDeleted).ToList() : items;
     }
 
     /// <summary>
@@ -45,8 +48,8 @@ public sealed class ItemsWindow : ToolWindow
         if (name is "DeleteButton" or "RestoreButton")
         {
             grid.CommitEdit(DataGridEditingUnit.Cell, true); grid.CommitEdit(DataGridEditingUnit.Row, true);
-            var targets = ((IEnumerable<Item>)grid.ItemsSource).Where(x => x.IsChecked).ToList();
-            if (targets.Count == 0 && grid.SelectedItem is Item selected) targets.Add(selected);
+            var targets = vm.Items.Where(x => x.IsChecked).ToList();
+            if (targets.Count == 0 && vm.SelectedItem is Item selected) targets.Add(selected);
             if (targets.Count == 0) { MessageBox.Show("対象の所持品を選択してください。"); return; }
             bool deleted = name == "DeleteButton";
             var purgeTargets = deleted && includeDeleted.IsChecked == true ? targets.Where(x => x.IsDeleted).ToList() : [];
@@ -73,7 +76,7 @@ public sealed class ItemsWindow : ToolWindow
         if (name == "AddButton") item = new Item();
         else
         {
-            if (grid.SelectedItem is not Item selected) { MessageBox.Show("所持品を選択してください。"); return; }
+            if (vm.SelectedItem is not Item selected) { MessageBox.Show("所持品を選択してください。"); return; }
             item = selected.Copy();
             if (name == "EditButton") { item.Id = selected.Id; item.IsDeleted = selected.IsDeleted; item.CreatedDate = selected.CreatedDate; }
         }

@@ -1,5 +1,6 @@
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Data;
 
 namespace MaintenanceCalendar;
 
@@ -10,6 +11,7 @@ internal sealed class InputSuggestions
     private readonly Func<string, IEnumerable<InputSuggestion>> find;
     private readonly Action<InputSuggestion>? accepted;
     private readonly ListBox list = new() { DisplayMemberPath = "Label", MaxHeight = 190, Focusable = false, BorderThickness = new Thickness(0) };
+    private readonly SuggestionViewModel vm = new();
     private readonly Popup popup;
     private bool committing;
 
@@ -17,6 +19,9 @@ internal sealed class InputSuggestions
     public InputSuggestions(TextBox input, Func<string, IEnumerable<InputSuggestion>> find, Action<InputSuggestion>? accepted = null)
     {
         this.input = input; this.find = find; this.accepted = accepted;
+        list.DataContext = vm;
+        list.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(SuggestionViewModel.Items)));
+        list.SetBinding(Selector.SelectedItemProperty, new Binding(nameof(SuggestionViewModel.SelectedItem)) { Mode = BindingMode.TwoWay });
         list.SetResourceReference(Control.BackgroundProperty, "CreamBrush");
         list.SetResourceReference(Control.ForegroundProperty, "TextBrush");
         var itemStyle = new Style(typeof(ListBoxItem));
@@ -50,7 +55,7 @@ internal sealed class InputSuggestions
     {
         if (!input.IsKeyboardFocused) return;
         var candidates = find(input.Text).Take(100).ToList();
-        list.ItemsSource = candidates; list.SelectedIndex = candidates.Count > 0 ? 0 : -1;
+        vm.Items = candidates; vm.SelectedItem = candidates.FirstOrDefault();
         list.MinWidth = Math.Max(100, input.ActualWidth - 8);
         popup.IsOpen = candidates.Count > 0;
     }

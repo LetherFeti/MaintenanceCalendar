@@ -4,7 +4,7 @@
     <DockPanel>
         <StackPanel DockPanel.Dock="Top">
             <TextBlock Text="定型文をダブルクリックすると追記できます。複数選択してまとめて追加することもできます。" TextWrapping="Wrap" Margin="0,0,0,8"/>
-            <ListBox x:Name="Templates" SelectionMode="Multiple" DisplayMemberPath="Summary" MaxHeight="140"/>
+            <ListBox x:Name="Templates" ItemsSource="{Binding Templates}" SelectionMode="Multiple" DisplayMemberPath="Summary" MaxHeight="140"/>
             <Button x:Name="AppendButton" Content="選択した内容をメモに追加" HorizontalAlignment="Left" Margin="0,8,0,8"/>
         </StackPanel>
         <TextBox x:Name="Memo" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxLength="20000"/>

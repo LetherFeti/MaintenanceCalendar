@@ -6,7 +6,7 @@
             <TextBlock Text="予定一覧" FontSize="21" Margin="0,0,0,6"/>
             <TextBlock Text="定期予定はシリーズ単位で管理します。カレンダーから開催回ごとの編集・取り消しもできます。" TextWrapping="Wrap"/>
         </StackPanel>
-        <DataGrid x:Name="Grid" Margin="0,8">
+        <DataGrid x:Name="Grid" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}" Margin="0,8">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="予定" Binding="{Binding Title}" ElementStyle="{StaticResource DataGridTextStyle}" Width="2*"/>
                 <DataGridTextColumn Header="開始" Binding="{Binding Start, StringFormat=yyyy/MM/dd HH:mm}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>

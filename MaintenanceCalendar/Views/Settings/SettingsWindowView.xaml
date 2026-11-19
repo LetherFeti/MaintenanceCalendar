@@ -17,11 +17,11 @@
                 <TextBlock Text="今日"/><TextBox x:Name="TodayColor" MaxLength="7"/>
                 <TextBlock Text="使用"/><TextBox x:Name="UseColor" MaxLength="7"/>
                 <TextBlock Text="お手入れ"/><TextBox x:Name="CareColor" MaxLength="7"/>
-                <TextBlock Text="今日の図形"/><ComboBox x:Name="Shape"/>
-                <TextBlock Text="サイドバーの表示位置"/><ComboBox x:Name="SidebarPosition" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+                <TextBlock Text="今日の図形"/><ComboBox x:Name="Shape" ItemsSource="{Binding Shapes}" SelectedItem="{Binding SelectedShape, Mode=TwoWay}"/>
+                <TextBlock Text="サイドバーの表示位置"/><ComboBox x:Name="SidebarPosition" ItemsSource="{Binding SidebarPositions}" SelectedValue="{Binding SelectedSidebarPosition, Mode=TwoWay}" DisplayMemberPath="Value" SelectedValuePath="Key"/>
                 <TextBlock Text="ウィンドウ"/><CheckBox x:Name="ShowInTaskbar" Content="Alt＋Tab に表示する"/>
                 <TextBlock Text="毎月・毎年の予定で基準日がない場合" FontSize="14"/>
-                <TextBlock Text="例：毎月31日、2月29日"/><ComboBox x:Name="MissingRecurrenceDate" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+                <TextBlock Text="例：毎月31日、2月29日"/><ComboBox x:Name="MissingRecurrenceDate" ItemsSource="{Binding MissingDateBehaviors}" SelectedValue="{Binding SelectedMissingDateBehavior, Mode=TwoWay}" DisplayMemberPath="Value" SelectedValuePath="Key"/>
                 <TextBlock Text="バックアップ / インポート" FontSize="18" Margin="0,10,0,0"/>
                 <TextBlock Text="DB・写真・設定をZIP保存します。停止中にZIPのDataフォルダをアプリフォルダへ展開しても復元できます。インポート直前のデータは別フォルダへ自動退避します。" TextWrapping="Wrap"/>
                 <WrapPanel><Button x:Name="BackupButton" Content="バックアップ"/><Button x:Name="ImportButton" Content="インポート"/></WrapPanel>

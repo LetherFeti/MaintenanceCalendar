@@ -3,6 +3,7 @@ namespace MaintenanceCalendar;
 public sealed class HistoryWindow : ToolWindow
 {
     private readonly HistoryWindowView view;
+    private readonly HistoryViewModel vm = new();
     private ComboBox combo => view.ItemCombo;
     private TextBlock last => view.LastText;
     private TextBlock pageText => view.PageText;
@@ -17,21 +18,19 @@ public sealed class HistoryWindow : ToolWindow
     /// </summary>
     public HistoryWindow(long? selected = null) : base("使用・手入れ履歴", 820, 560)
     {
-        view = new HistoryWindowView(); Root.Children.Add(view);
+        view = new HistoryWindowView(); view.DataContext = vm; Root.Children.Add(view);
 
         var items = Services.Db.GetItems();
 
         var choices = new List<Item> { new() }; choices.AddRange(items);
-        combo.ItemsSource = choices;
-        combo.DisplayMemberPath = "DisplayName";
-        combo.SelectedValuePath = "Id";
-        combo.SelectedValue = selected ?? 0L;
+        vm.Items = choices;
+        vm.SelectedItem = choices.FirstOrDefault(x => x.Id == (selected ?? 0L)) ?? choices[0];
 
         previous = Ui.Button("PreviousButton", "前へ", Button_Click); Actions.Children.Add(previous);
 
         next = Ui.Button("NextButton", "次へ", Button_Click); Actions.Children.Add(next);
 
-        grid.SelectionChanged += (_, _) => memo.Text = (grid.SelectedItem as HistoryRow)?.Memo ?? "";
+        grid.SelectionChanged += (_, _) => memo.Text = vm.SelectedRecord?.Memo ?? "";
 
         combo.SelectionChanged += (_, _) => Ui.Run(() => { page = 0; Refresh(); }); Refresh();
     }
@@ -40,7 +39,7 @@ public sealed class HistoryWindow : ToolWindow
     /// </summary>
     private void Refresh()
     {
-        if (combo.SelectedItem is not Item { Id: > 0 } item) { last.Text = "所持品を選択してください。"; grid.ItemsSource = null; previous.IsEnabled = next.IsEnabled = false; return; }
+        if (vm.SelectedItem is not Item { Id: > 0 } item) { last.Text = "所持品を選択してください。"; vm.Records = Array.Empty<HistoryRow>(); previous.IsEnabled = next.IsEnabled = false; return; }
 
         // 日付を表示形式へ変換し、値がなければ未登録の文言を返します。
         string TextDate(DateTime? d) => d?.ToString("yyyy/MM/dd") ?? "未登録";
@@ -51,7 +50,7 @@ public sealed class HistoryWindow : ToolWindow
 
         next.IsEnabled = records.Count > PageSize; previous.IsEnabled = page > 0;
 
-        grid.ItemsSource = records.Take(PageSize).ToList(); pageText.Text = $"{page + 1}ページ（1ページ{PageSize}件・日付降順）";
+        vm.Records = records.Take(PageSize).ToList(); pageText.Text = $"{page + 1}ページ（1ページ{PageSize}件・日付降順）";
     }
     /// <summary>
     /// 前後のページへ移動し、選択品の履歴を読み直します。

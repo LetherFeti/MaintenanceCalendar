@@ -3,6 +3,7 @@ namespace MaintenanceCalendar;
 public sealed class CareMemoWindow : ToolWindow
 {
     private readonly CareMemoWindowView view;
+    private readonly CareMemoViewModel vm = new();
     private TextBox memo => view.Memo;
     private ListBox templates => view.Templates;
     public string Memo => memo.Text;
@@ -11,8 +12,9 @@ public sealed class CareMemoWindow : ToolWindow
     /// </summary>
     public CareMemoWindow(string initial) : base("お手入れメモ", 500, 530)
     {
-        view = new CareMemoWindowView(); Root.Children.Add(view);
-        templates.ItemsSource = Services.Db.Templates();
+        view = new CareMemoWindowView(); view.DataContext = vm; Root.Children.Add(view);
+        vm.Templates = Services.Db.Templates();
+        templates.SelectionChanged += (_, _) => vm.SelectedTemplates = templates.SelectedItems.Cast<TemplateRow>().ToList();
         view.AppendButton.Click += Button_Click;
         templates.MouseDoubleClick += (_, _) =>
         {
@@ -37,7 +39,7 @@ public sealed class CareMemoWindow : ToolWindow
 
     private void AppendSelectedTemplates()
     {
-        AppendTemplates(templates.SelectedItems.Cast<TemplateRow>());
+        AppendTemplates(vm.SelectedTemplates);
     }
 
     private void AppendTemplates(IEnumerable<TemplateRow> rows)

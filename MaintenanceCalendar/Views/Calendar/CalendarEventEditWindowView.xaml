@@ -11,7 +11,7 @@
             </WrapPanel>
             <TextBlock Text="場所" Margin="0,8,0,0"/><TextBox x:Name="Location" MinWidth="240"/>
             <TextBlock Text="説明" Margin="0,8,0,0"/><TextBox x:Name="Description" AcceptsReturn="True" TextWrapping="Wrap" Height="80" VerticalScrollBarVisibility="Auto"/>
-            <TextBlock Text="繰り返し" Margin="0,8,0,0"/><ComboBox x:Name="Recurrence" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+            <TextBlock Text="繰り返し" Margin="0,8,0,0"/><ComboBox x:Name="Recurrence" ItemsSource="{Binding Options}" SelectedValue="{Binding SelectedValue, Mode=TwoWay}" DisplayMemberPath="Value" SelectedValuePath="Key"/>
             <StackPanel x:Name="RecurrenceEndField" Margin="0,8,0,0">
                 <TextBlock Text="終了日（空欄は終了なし）"/><DatePicker x:Name="RecurrenceEnd" Width="190"/>
             </StackPanel>

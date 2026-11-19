@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private bool weekScrollInitialized;
     private List<Item> items = [];
     private ComboBox combo = null!;
+    private readonly ItemComboViewModel comboViewModel = new();
     private Dictionary<DateTime, string> holidays = [];
     private bool locked;
     private int dueCount;
@@ -94,14 +95,16 @@ public partial class MainWindow : Window
         if (locked && msg == 0x21) { handled = true; return new IntPtr(3); } // WM_MOUSEACTIVATE: MA_NOACTIVATE
         return IntPtr.Zero;
     }
-    private long? SelectedId => combo?.SelectedItem is Item { Id: > 0 } item ? item.Id : null;
+    private long? SelectedId => comboViewModel.SelectedItem is Item { Id: > 0 } item ? item.Id : null;
     /// <summary>
     /// 所持品・祝日・選択状態を再取得し、設定と期限件数を反映してカレンダーを再描画します。
     /// </summary>
     private void RefreshData()
     {
         long? selected = SelectedId; items = Services.Db.GetItems(); holidays = Services.Db.Holidays();
-        combo = Ui.ItemCombo(items, items.Any(x => x.Id == selected) ? selected : null);
+        comboViewModel.Items = [new Item(), .. items];
+        comboViewModel.SelectedItem = comboViewModel.Items.FirstOrDefault(x => x.Id == (selected ?? 0L)) ?? comboViewModel.Items[0];
+        combo = Ui.ItemCombo(comboViewModel);
         combo.SelectionChanged += (_, _) => Ui.Run(RenderCalendar); ComboHost.Content = combo;
         Services.Settings.Apply(); RenderSidebar(); RefreshDueCount(); RenderCalendar();
     }

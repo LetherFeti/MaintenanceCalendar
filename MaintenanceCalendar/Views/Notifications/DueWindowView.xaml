@@ -4,7 +4,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="0,0,0,8">
             <TextBlock x:Name="EventsHeading" FontSize="20"/>
-            <ItemsControl x:Name="EventsList" Margin="0,0,0,10">
+            <ItemsControl x:Name="EventsList" ItemsSource="{Binding Events}" Margin="0,0,0,10">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border CornerRadius="8" Padding="10,7" Margin="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1">
@@ -20,7 +20,7 @@
             <TextBlock x:Name="EmptyEvents" Text="今日の予定はありません。"/>
             <TextBlock x:Name="DueHeading" FontSize="20" Margin="0,8,0,0"/>
             <TextBlock Text="未手入れの場合は購入日、購入日がなければ登録日を基準にしています。" TextWrapping="Wrap"/>
-            <DataGrid x:Name="Grid" MinHeight="160" MaxHeight="280" Margin="0,8">
+            <DataGrid x:Name="Grid" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}" MinHeight="160" MaxHeight="280" Margin="0,8">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="所持品" Binding="{Binding Name}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
                     <DataGridTextColumn Header="最終お手入れ" Binding="{Binding LastCareText}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>

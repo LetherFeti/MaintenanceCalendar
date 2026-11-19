@@ -9,6 +9,7 @@ public sealed class DayWindow : ToolWindow
 {
     private readonly DateTime date;
     private readonly DayWindowView view;
+    private readonly DayViewModel vm = new();
     private DataGrid grid => view.Grid;
     private readonly List<DayItem> rows;
     private readonly ICollectionView visibleRows;
@@ -39,24 +40,24 @@ public sealed class DayWindow : ToolWindow
     private Button saveEventButton => view.SaveEventButton;
     private Button deleteEventButton => view.DeleteEventButton;
     private TabControl tabs => view.Tabs;
-    private CalendarEvent? selectedEvent;
 
     /// <summary>当日の登録状況と一括登録の対象を一覧表示します。</summary>
     public DayWindow(DateTime date, IReadOnlyList<Item> items, long? selected, TimeSpan? initialEventTime = null) : base(date.ToString("yyyy年M月d日（ddd）"), 740, 610)
     {
         this.date = date;
-        view = new DayWindowView(); Root.Children.Add(view);
+        view = new DayWindowView(); view.DataContext = vm; Root.Children.Add(view);
         MinWidth = 660; MinHeight = 800;
         Cursor = Cursors.Arrow;
         use = view.UseButton; care = view.CareButton; cancelCare = view.CancelCareButton;
-        recurrence.ItemsSource = new Dictionary<string, string> { ["None"] = "繰り返しなし", ["Weekly"] = "毎週", ["Biweekly"] = "隔週", ["Monthly"] = "毎月", ["Yearly"] = "毎年" };
-        eventScope.ItemsSource = new Dictionary<string, string> { ["Occurrence"] = "この回だけ", ["Series"] = "シリーズ全体" };
+        vm.RecurrenceOptions = new Dictionary<string, string> { ["None"] = "繰り返しなし", ["Weekly"] = "毎週", ["Biweekly"] = "隔週", ["Monthly"] = "毎月", ["Yearly"] = "毎年" };
+        vm.EventScopeOptions = new Dictionary<string, string> { ["Occurrence"] = "この回だけ", ["Series"] = "シリーズ全体" };
         search.Cursor = eventTitle.Cursor = eventStart.Cursor = eventEnd.Cursor = eventLocation.Cursor = eventDescription.Cursor = Cursors.IBeam;
         memo.Cursor = Cursors.Arrow;
         eventDate.Cursor = notifyPrevious.Cursor = notify15.Cursor = notify5.Cursor = Cursors.Arrow;
         rows = items.Select(x => new DayItem(x)).ToList();
         visibleRows = CollectionViewSource.GetDefaultView(rows);
         visibleRows.Filter = MatchesFilter;
+        vm.DayRows = visibleRows;
         showUsed.Cursor = showCared.Cursor = Cursors.Arrow;
         view.CheckAllButton.Cursor = Cursors.Arrow;
         foreach (var button in new[] { view.CheckAllButton, use, care, cancelCare }) button.Click += Button_Click;
@@ -76,7 +77,6 @@ public sealed class DayWindow : ToolWindow
         check.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty, new Binding(nameof(DayItem.IsChecked)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
         grid.Columns.Insert(0, new DataGridTemplateColumn { Header = "対象", CellTemplate = new DataTemplate { VisualTree = check }, Width = 54 });
         grid.Columns[4].Width = 100; grid.Columns[5].Width = 120;
-        grid.ItemsSource = visibleRows;
         grid.Cursor = Cursors.Arrow;
         grid.MouseDoubleClick += (_, e) =>
         {
@@ -96,7 +96,7 @@ public sealed class DayWindow : ToolWindow
         BuildEventTab();
         tabs.SelectionChanged += (_, _) => UpdateActionMode();
         grid.SelectionChanged += (_, _) => UpdateSelection();
-        grid.SelectedItem = rows.FirstOrDefault(x => x.Id == selected);
+        vm.SelectedDayItem = rows.FirstOrDefault(x => x.Id == selected);
         Refresh();
         RefreshEvents();
         if (initialEventTime is { } startAt)
@@ -130,55 +130,55 @@ public sealed class DayWindow : ToolWindow
 
     private void RefreshEvents()
     {
-        eventList.ItemsSource = Services.Db.Events(date.Date, date.Date.AddDays(1), Services.Settings.MissingRecurrenceDateBehavior);
-        eventList.SelectedItem = selectedEvent is null ? null : ((IEnumerable<CalendarEvent>)eventList.ItemsSource).FirstOrDefault(x => x.Id == selectedEvent.Id);
-        if (selectedEvent is null) NewEventForm();
+        vm.Events = Services.Db.Events(date.Date, date.Date.AddDays(1), Services.Settings.MissingRecurrenceDateBehavior);
+        vm.SelectedEvent = vm.SelectedEvent is null ? null : vm.Events.FirstOrDefault(x => x.Id == vm.SelectedEvent.Id);
+        if (vm.SelectedEvent is null) NewEventForm();
     }
 
     private void LoadSelectedEvent()
     {
-        if (eventList.SelectedItem is not CalendarEvent entry) return;
-        selectedEvent = entry; eventTitle.Text = entry.Title; eventDate.SelectedDate = entry.Start.Date;
+        if (vm.SelectedEvent is not CalendarEvent entry) return;
+        eventTitle.Text = entry.Title; eventDate.SelectedDate = entry.Start.Date;
         eventStart.Text = entry.Start.ToString("HH:mm"); eventEnd.Text = entry.End.ToString("HH:mm");
         eventLocation.Text = entry.Location; eventDescription.Text = entry.Description;
         notifyPrevious.IsChecked = entry.NotifyPreviousDay; notify15.IsChecked = entry.Notify15Minutes; notify5.IsChecked = entry.Notify5Minutes;
-        recurrence.SelectedValue = entry.Recurrence; recurrenceEnd.SelectedDate = entry.RecurrenceEnd?.Date;
-        eventScope.SelectedValue = "Occurrence";
+        vm.SelectedRecurrence = entry.Recurrence; recurrenceEnd.SelectedDate = entry.RecurrenceEnd?.Date;
+        vm.SelectedEventScope = "Occurrence";
         eventFormHeading.Text = "予定を編集"; UpdateEventRecurrenceState(); UpdateEventScopeState();
     }
 
     private void NewEventForm()
     {
-        selectedEvent = null; eventList.SelectedItem = null; eventTitle.Clear(); eventDate.SelectedDate = date;
+        vm.SelectedEvent = null; eventTitle.Clear(); eventDate.SelectedDate = date;
         eventStart.Text = "09:00"; eventEnd.Text = "10:00"; eventLocation.Clear(); eventDescription.Clear();
         notifyPrevious.IsChecked = notify15.IsChecked = notify5.IsChecked = true;
-        recurrence.SelectedValue = "None"; recurrenceEnd.SelectedDate = null; eventScope.SelectedValue = "Occurrence";
+        vm.SelectedRecurrence = "None"; recurrenceEnd.SelectedDate = null; vm.SelectedEventScope = "Occurrence";
         eventFormHeading.Text = "新しい予定"; UpdateEventRecurrenceState(); UpdateEventScopeState();
     }
 
     private void UpdateEventRecurrenceState()
     {
-        bool recurring = recurrence.SelectedValue is string value && value != "None";
+        bool recurring = vm.SelectedRecurrence is string value && value != "None";
         if (recurrenceEndField is not null) recurrenceEndField.Visibility = recurring ? Visibility.Visible : Visibility.Collapsed;
-        if (eventScopeField is not null) eventScopeField.Visibility = selectedEvent?.IsRecurringOccurrence == true ? Visibility.Visible : Visibility.Collapsed;
+        if (eventScopeField is not null) eventScopeField.Visibility = vm.SelectedEvent?.IsRecurringOccurrence == true ? Visibility.Visible : Visibility.Collapsed;
         UpdateEventActionState();
     }
 
     private void UpdateEventScopeState()
     {
-        bool recurringOccurrence = selectedEvent?.IsRecurringOccurrence == true;
-        bool onlyThis = recurringOccurrence && (string?)eventScope.SelectedValue == "Occurrence";
+        bool recurringOccurrence = vm.SelectedEvent?.IsRecurringOccurrence == true;
+        bool onlyThis = recurringOccurrence && vm.SelectedEventScope == "Occurrence";
         recurrence.IsEnabled = !onlyThis; recurrenceEnd.IsEnabled = !onlyThis;
         if (recurringOccurrence && !onlyThis)
         {
-            eventDate.SelectedDate = selectedEvent!.SeriesStart.Date;
-            eventStart.Text = selectedEvent.SeriesStart.ToString("HH:mm");
-            eventEnd.Text = selectedEvent.SeriesStart.Add(selectedEvent.End - selectedEvent.Start).ToString("HH:mm");
+            eventDate.SelectedDate = vm.SelectedEvent!.SeriesStart.Date;
+            eventStart.Text = vm.SelectedEvent.SeriesStart.ToString("HH:mm");
+            eventEnd.Text = vm.SelectedEvent.SeriesStart.Add(vm.SelectedEvent.End - vm.SelectedEvent.Start).ToString("HH:mm");
         }
         else if (onlyThis)
         {
-            eventDate.SelectedDate = selectedEvent!.Start.Date;
-            eventStart.Text = selectedEvent.Start.ToString("HH:mm"); eventEnd.Text = selectedEvent.End.ToString("HH:mm");
+            eventDate.SelectedDate = vm.SelectedEvent!.Start.Date;
+            eventStart.Text = vm.SelectedEvent.Start.ToString("HH:mm"); eventEnd.Text = vm.SelectedEvent.End.ToString("HH:mm");
         }
         if (deleteEventButton is not null) deleteEventButton.Content = onlyThis ? "この回を削除" : "予定を削除";
         if (saveEventButton is not null) saveEventButton.Content = onlyThis ? "この回を保存" : recurringOccurrence ? "シリーズを保存" : "予定を保存";
@@ -199,7 +199,7 @@ public sealed class DayWindow : ToolWindow
         if (saveEventButton is not null)
             saveEventButton.IsEnabled = !string.IsNullOrWhiteSpace(eventTitle.Text) && eventDate.SelectedDate.HasValue
                 && TimeSpan.TryParse(eventStart.Text, out _) && TimeSpan.TryParse(eventEnd.Text, out _);
-        if (deleteEventButton is not null) deleteEventButton.IsEnabled = selectedEvent is not null;
+        if (deleteEventButton is not null) deleteEventButton.IsEnabled = vm.SelectedEvent is not null;
     }
 
     private void EventButton_Click(object sender, RoutedEventArgs e) => Ui.Run(() =>
@@ -207,10 +207,10 @@ public sealed class DayWindow : ToolWindow
         switch (((Button)sender).Name)
         {
             case "DeleteCalendarEventButton":
-                if (selectedEvent is not null && Ui.Confirm((selectedEvent.IsRecurringOccurrence && (string?)eventScope.SelectedValue == "Occurrence" ? "この回だけ" : "予定") + "を削除しますか？"))
+                if (vm.SelectedEvent is not null && Ui.Confirm((vm.SelectedEvent.IsRecurringOccurrence && vm.SelectedEventScope == "Occurrence" ? "この回だけ" : "予定") + "を削除しますか？"))
                 {
-                    if (selectedEvent.IsRecurringOccurrence && (string?)eventScope.SelectedValue == "Occurrence") Services.Db.DeleteEventOccurrence(selectedEvent);
-                    else Services.Db.DeleteEvent(selectedEvent.Id);
+                    if (vm.SelectedEvent.IsRecurringOccurrence && vm.SelectedEventScope == "Occurrence") Services.Db.DeleteEventOccurrence(vm.SelectedEvent);
+                    else Services.Db.DeleteEvent(vm.SelectedEvent.Id);
                 }
                 NewEventForm(); RefreshEvents(); return;
         }
@@ -220,7 +220,7 @@ public sealed class DayWindow : ToolWindow
         if (end <= start) end = end.AddDays(1);
         var edited = new CalendarEvent
         {
-            Id = selectedEvent?.Id ?? 0,
+            Id = vm.SelectedEvent?.Id ?? 0,
             Title = eventTitle.Text,
             Start = start,
             End = end,
@@ -229,11 +229,11 @@ public sealed class DayWindow : ToolWindow
             NotifyPreviousDay = notifyPrevious.IsChecked == true,
             Notify15Minutes = notify15.IsChecked == true,
             Notify5Minutes = notify5.IsChecked == true,
-            Notified = selectedEvent?.Notified ?? "",
-            Recurrence = recurrence.SelectedValue as string ?? "None",
+            Notified = vm.SelectedEvent?.Notified ?? "",
+            Recurrence = vm.SelectedRecurrence ?? "None",
             RecurrenceEnd = recurrenceEnd.SelectedDate?.Date
         };
-        if (selectedEvent?.IsRecurringOccurrence == true && (string?)eventScope.SelectedValue == "Occurrence") Services.Db.SaveEventOccurrence(selectedEvent, edited);
+        if (vm.SelectedEvent?.IsRecurringOccurrence == true && vm.SelectedEventScope == "Occurrence") Services.Db.SaveEventOccurrence(vm.SelectedEvent, edited);
         else Services.Db.SaveEvent(edited);
         NewEventForm(); RefreshEvents();
     });
@@ -291,7 +291,7 @@ public sealed class DayWindow : ToolWindow
 
     private void UpdateSelection()
     {
-        var row = grid.SelectedItem as DayItem;
+        var row = vm.SelectedDayItem as DayItem;
         var entry = records.FirstOrDefault(x => x.ItemId == row?.Id && x.Work == 2);
         var targets = visibleRows.Cast<DayItem>().Where(x => x.IsChecked).ToList();
         use.IsEnabled = targets.Count > 0 ? targets.Any(x => !x.Used) : row is not null;
@@ -329,7 +329,7 @@ public sealed class DayWindow : ToolWindow
             Services.Db.SaveMissingHistory(date, targets, work, commonMemo);
             Refresh(); return;
         }
-        if (grid.SelectedItem is not DayItem selected) return;
+        if (vm.SelectedDayItem is not DayItem selected) return;
         switch (name)
         {
             case "UseButton":

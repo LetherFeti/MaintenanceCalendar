@@ -13,7 +13,7 @@
             <Button x:Name="DeleteButton" Content="削除"/>
             <Button x:Name="NewButton" Content="入力をクリア"/>
         </WrapPanel>
-        <DataGrid x:Name="Grid">
+        <DataGrid x:Name="Grid" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="手入れ概要" Binding="{Binding Summary}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
                 <DataGridTextColumn Header="状態" Binding="{Binding Status}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>

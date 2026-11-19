@@ -6,6 +6,7 @@ public sealed class SettingsWindow : ToolWindow
 {
     private readonly Dictionary<string, TextBox> colors = [];
     private readonly SettingsWindowView view;
+    private readonly SettingsViewModel vm = new();
     private ComboBox shape => view.Shape;
     private ComboBox missingRecurrenceDate => view.MissingRecurrenceDate;
     private CheckBox showInTaskbar => view.ShowInTaskbar;
@@ -20,21 +21,21 @@ public sealed class SettingsWindow : ToolWindow
     /// </summary>
     public SettingsWindow() : base("設定", 590, 730)
     {
-        view = new SettingsWindowView(); Root.Children.Add(view);
+        view = new SettingsWindowView(); view.DataContext = vm; Root.Children.Add(view);
         colors["Theme"] = view.ThemeColor; colors["Background"] = view.BackgroundColor;
         colors["Today"] = view.TodayColor; colors["Use"] = view.UseColor; colors["Care"] = view.CareColor;
-        shape.ItemsSource = new[] { "●", "■", "▼" };
-        missingRecurrenceDate.ItemsSource = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" };
-        sidebarPosition.ItemsSource = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" };
+        vm.Shapes = ["●", "■", "▼"];
+        vm.MissingDateBehaviors = new Dictionary<string, string> { ["LastDay"] = "月末日にする", ["Skip"] = "その回は作らない" };
+        vm.SidebarPositions = new Dictionary<string, string> { ["Left"] = "左", ["Right"] = "右", ["Top"] = "上", ["Bottom"] = "下" };
         foreach (var button in new[] { view.SaveButton, view.HolidayButton, view.CloseButton, view.BackupButton, view.ImportButton, view.StartupOnButton, view.StartupOffButton }) button.Click += Button_Click;
         var settings = Services.Settings;
         colors["Theme"].Text = settings.ThemeColor; colors["Background"].Text = settings.BackgroundColor;
         colors["Today"].Text = settings.TodayColor; colors["Use"].Text = settings.UseColor; colors["Care"].Text = settings.CareColor;
 
-        shape.SelectedItem = settings.TodayShape;
-        sidebarPosition.SelectedValue = settings.SidebarPosition;
+        vm.SelectedShape = settings.TodayShape;
+        vm.SelectedSidebarPosition = settings.SidebarPosition;
         showInTaskbar.IsChecked = settings.ShowInTaskbar;
-        missingRecurrenceDate.SelectedValue = settings.MissingRecurrenceDateBehavior;
+        vm.SelectedMissingDateBehavior = settings.MissingRecurrenceDateBehavior;
         view.DataPath.Text = "保存先：" + Services.Data;
 
         AddDirtyTracking(); UpdateStatus();
@@ -61,9 +62,9 @@ public sealed class SettingsWindow : ToolWindow
         var current = Services.Settings;
         return colors["Theme"].Text.Trim() != current.ThemeColor || colors["Background"].Text.Trim() != current.BackgroundColor
             || colors["Today"].Text.Trim() != current.TodayColor || colors["Use"].Text.Trim() != current.UseColor
-            || colors["Care"].Text.Trim() != current.CareColor || (string?)shape.SelectedItem != current.TodayShape
-            || (string?)sidebarPosition.SelectedValue != current.SidebarPosition || showInTaskbar.IsChecked != current.ShowInTaskbar
-            || (string?)missingRecurrenceDate.SelectedValue != current.MissingRecurrenceDateBehavior;
+            || colors["Care"].Text.Trim() != current.CareColor || vm.SelectedShape != current.TodayShape
+            || vm.SelectedSidebarPosition != current.SidebarPosition || showInTaskbar.IsChecked != current.ShowInTaskbar
+            || vm.SelectedMissingDateBehavior != current.MissingRecurrenceDateBehavior;
     }
 
     private void UpdateDirtyStatus() => operationStatus.Text = HasUnsavedChanges() ? "未保存の設定があります。" : string.Empty;
@@ -97,11 +98,11 @@ public sealed class SettingsWindow : ToolWindow
                         TodayColor = colors["Today"].Text.Trim(),
                         UseColor = colors["Use"].Text.Trim(),
                         CareColor = colors["Care"].Text.Trim(),
-                        TodayShape = (string)shape.SelectedItem,
-                        SidebarPosition = (string)sidebarPosition.SelectedValue,
+                        TodayShape = vm.SelectedShape!,
+                        SidebarPosition = vm.SelectedSidebarPosition!,
                         SidebarShowLabels = Services.Settings.SidebarShowLabels,
                         ShowInTaskbar = showInTaskbar.IsChecked == true,
-                        MissingRecurrenceDateBehavior = (string)missingRecurrenceDate.SelectedValue,
+                        MissingRecurrenceDateBehavior = vm.SelectedMissingDateBehavior!,
                         WindowLeft = Services.Settings.WindowLeft,
                         WindowTop = Services.Settings.WindowTop,
                         WindowWidth = Services.Settings.WindowWidth,

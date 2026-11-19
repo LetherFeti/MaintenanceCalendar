@@ -30,7 +30,7 @@
                         <TextBlock Text="お手入れメモ（表示のみ。編集は下部の「お手入れ」ボタン）" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}"/>
                         <TextBox x:Name="Memo" IsReadOnly="True" IsTabStop="False" Focusable="False" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="85"/>
                     </StackPanel>
-                    <DataGrid x:Name="Grid" IsReadOnly="False" Margin="0,8">
+                    <DataGrid x:Name="Grid" ItemsSource="{Binding DayRows}" SelectedItem="{Binding SelectedDayItem, Mode=TwoWay}" IsReadOnly="False" Margin="0,8">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="メーカー" Binding="{Binding Manufacturer}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
                             <DataGridTextColumn Header="モデル" Binding="{Binding Model}" ElementStyle="{StaticResource DataGridTextStyle}" IsReadOnly="True" Width="*"/>
@@ -48,7 +48,7 @@
                             <TextBlock x:Name="EventCount" Text="一覧から選ぶと編集できます" FontSize="12" Foreground="{DynamicResource MutedBrush}" DockPanel.Dock="Right"/>
                             <TextBlock Text="この日の予定" FontSize="16"/>
                         </DockPanel>
-                        <ListBox x:Name="EventList" MinHeight="90" MaxHeight="120" Margin="0,0,0,14">
+                        <ListBox x:Name="EventList" ItemsSource="{Binding Events}" SelectedItem="{Binding SelectedEvent, Mode=TwoWay}" MinHeight="90" MaxHeight="120" Margin="0,0,0,14">
                             <ListBox.ItemTemplate>
                                 <DataTemplate><Border CornerRadius="9" Padding="10,7" Margin="2" Background="{DynamicResource CreamBrush}"><DockPanel><TextBlock Text="{Binding Start, StringFormat=HH:mm}" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,14,0"/><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" FontWeight="Medium"/></DockPanel></Border></DataTemplate>
                             </ListBox.ItemTemplate>
@@ -62,9 +62,9 @@
                                     <StackPanel Margin="0,0,14,4"><TextBlock Text="開始"/><TextBox x:Name="EventStart" Width="108" Text="09:00"/></StackPanel>
                                     <StackPanel Margin="0,0,14,4"><TextBlock Text="終了"/><TextBox x:Name="EventEnd" Width="108" Text="10:00"/></StackPanel>
                                 </WrapPanel>
-                                <TextBlock Text="繰り返し"/><ComboBox x:Name="Recurrence" DisplayMemberPath="Value" SelectedValuePath="Key"/>
+                                <TextBlock Text="繰り返し"/><ComboBox x:Name="Recurrence" ItemsSource="{Binding RecurrenceOptions}" SelectedValue="{Binding SelectedRecurrence, Mode=TwoWay}" DisplayMemberPath="Value" SelectedValuePath="Key"/>
                                 <StackPanel x:Name="RecurrenceEndField"><TextBlock Text="終了日（空欄は終了なし）"/><DatePicker x:Name="RecurrenceEnd" Width="190"/></StackPanel>
-                                <StackPanel x:Name="EventScopeField" Visibility="Collapsed"><TextBlock Text="適用範囲"/><ComboBox x:Name="EventScope" DisplayMemberPath="Value" SelectedValuePath="Key"/></StackPanel>
+                                <StackPanel x:Name="EventScopeField" Visibility="Collapsed"><TextBlock Text="適用範囲"/><ComboBox x:Name="EventScope" ItemsSource="{Binding EventScopeOptions}" SelectedValue="{Binding SelectedEventScope, Mode=TwoWay}" DisplayMemberPath="Value" SelectedValuePath="Key"/></StackPanel>
                                 <TextBlock Text="場所"/><TextBox x:Name="EventLocation" MinWidth="220"/>
                                 <TextBlock Text="説明"/><TextBox x:Name="EventDescription" AcceptsReturn="True" TextWrapping="Wrap" Height="65" VerticalScrollBarVisibility="Auto"/>
                                 <TextBlock Text="通知タイミング" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}"/>

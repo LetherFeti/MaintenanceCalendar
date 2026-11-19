@@ -4,12 +4,12 @@
     <DockPanel>
         <StackPanel DockPanel.Dock="Top">
             <TextBlock Text="使用・手入れ履歴" FontSize="21" Margin="0,0,0,6"/>
-            <ComboBox x:Name="ItemCombo" Margin="0,0,0,6"/>
+            <ComboBox x:Name="ItemCombo" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}" DisplayMemberPath="DisplayName" Margin="0,0,0,6"/>
             <TextBlock x:Name="LastText" Margin="0,2" TextWrapping="Wrap"/>
             <TextBlock x:Name="PageText" Margin="0,2,0,6"/>
         </StackPanel>
         <TextBox x:Name="Memo" DockPanel.Dock="Bottom" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="90" VerticalScrollBarVisibility="Auto"/>
-        <DataGrid x:Name="Grid" Margin="0,8">
+        <DataGrid x:Name="Grid" ItemsSource="{Binding Records}" SelectedItem="{Binding SelectedRecord, Mode=TwoWay}" Margin="0,8">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="日付" Binding="{Binding Date, StringFormat=yyyy/MM/dd}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>
                 <DataGridTextColumn Header="作業" Binding="{Binding WorkLabel}" ElementStyle="{StaticResource DataGridTextStyle}" Width="*"/>

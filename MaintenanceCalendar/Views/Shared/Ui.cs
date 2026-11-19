@@ -60,13 +60,12 @@ public static class Ui
     /// <summary>
     /// 所持品の選択・空欄・初期値・写真プレビューを備えたコンボボックスを生成します。
     /// </summary>
-    public static ComboBox ItemCombo(IReadOnlyList<Item> items, long? selected = null, bool blank = true)
+    public static ComboBox ItemCombo(ItemComboViewModel vm)
     {
-        var combo = new ComboBox { DisplayMemberPath = nameof(Item.DisplayName), SelectedValuePath = nameof(Item.Id) };
-
-        var source = new List<Item>(); if (blank) source.Add(new Item()); source.AddRange(items);
-
-        combo.ItemsSource = source; combo.SelectedValue = selected ?? (blank ? 0L : items.FirstOrDefault()?.Id);
+        var combo = new ComboBox { DisplayMemberPath = nameof(Item.DisplayName), SelectedValuePath = nameof(Item.Id), DataContext = vm };
+        combo.SetBinding(ItemsControl.ItemsSourceProperty, new Binding(nameof(ItemComboViewModel.Items)));
+        combo.SetBinding(System.Windows.Controls.Primitives.Selector.SelectedItemProperty,
+            new Binding(nameof(ItemComboViewModel.SelectedItem)) { Mode = BindingMode.TwoWay });
 
         var photos = new Dictionary<string, System.Windows.Media.Imaging.BitmapImage>();
 
