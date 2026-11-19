@@ -6,7 +6,7 @@
         <StackPanel>
             <TextBlock Text="所持品のダッシュボード" FontSize="23"/>
             <TextBlock Text="お気に入りと過ごした日々を、ひと目で。削除済みの所持品は含みません。" FontSize="11" Foreground="{DynamicResource MutedBrush}"/>
-            <primitives:UniformGrid x:Name="Metrics" Columns="3" Margin="0,6,0,8"/>
+            <primitives:UniformGrid x:Name="Metrics" Columns="2" Margin="0,6,0,8"/>
             <Grid x:Name="Cards"/>
         </StackPanel>
     </ScrollViewer>

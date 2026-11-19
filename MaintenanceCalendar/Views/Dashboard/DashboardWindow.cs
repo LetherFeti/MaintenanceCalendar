@@ -4,13 +4,12 @@ namespace MaintenanceCalendar;
 
 public sealed class DashboardWindow : ToolWindow
 {
-    /// <summary>従来と同じ有効品・使用回数・購入日・期限の集計をカードと円グラフで表示します。</summary>
+    /// <summary>有効品の使用状況・手入れ記録・購入日をカードと円グラフで表示します。</summary>
     public DashboardWindow() : base("ダッシュボード", 660, 510)
     {
         var view = new DashboardWindowView(); Root.Children.Add(view);
         var items = Services.Db.GetItems().ToDictionary(x => x.Id);
         var usage = Services.Db.UsageCounts();
-        int due = Services.Db.Due(DateTime.Today).Count;
         var recentCare = Services.Db.RecentCare();
         var monthRecords = Services.Db.Month(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1), null);
         var lastUse = Services.Db.LastUseDates();
@@ -18,7 +17,6 @@ public sealed class DashboardWindow : ToolWindow
         var metrics = view.Metrics;
         metrics.Children.Add(Metric("登録中", $"{items.Count:N0}", "点"));
         metrics.Children.Add(Metric("使用記録", $"{total:N0}", "回"));
-        metrics.Children.Add(Metric("期限到来", $"{due:N0}", "点"));
         var cards = view.Cards;
         var recentPanel = new StackPanel(); recentPanel.Children.Add(Ui.Text("最近のお手入れ", 16));
         if (recentCare.Count == 0) recentPanel.Children.Add(Muted("お手入れ記録がありません。"));
@@ -31,13 +29,19 @@ public sealed class DashboardWindow : ToolWindow
         monthNumber.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush"); monthPanel.Children.Add(monthNumber);
         monthPanel.Children.Add(Muted($"使用 {monthUses:N0}回  /  お手入れ {monthCares:N0}回"));
         monthPanel.Children.Add(Muted(monthTotal == 0 ? "今月の記録はありません。" : $"{DateTime.Today:yyyy年M月}の記録"));
-        var idlePanel = new StackPanel(); idlePanel.Children.Add(Ui.Text("しばらく使っていない所持品", 16));
+        var idlePanel = new StackPanel(); idlePanel.Children.Add(Ui.Text("未使用期間が長い所持品 TOP 5", 16));
         var idleItems = items.Values.OrderBy(x => lastUse.TryGetValue(x.Id, out var date) ? date : DateTime.MinValue).ThenBy(x => x.DisplayName).Take(5).ToList();
         if (idleItems.Count == 0) idlePanel.Children.Add(Muted("所持品が登録されていません。"));
-        foreach (var item in idleItems)
-            idlePanel.Children.Add(Ui.Text(lastUse.TryGetValue(item.Id, out var date)
-                ? $"{item.DisplayName}  /  最終使用 {date:yyyy/MM/dd}（{Math.Max(0, (DateTime.Today - date.Date).Days):N0}日前）"
-                : $"{item.DisplayName}  /  使用記録なし", 13));
+        for (int n = 0; n < idleItems.Count; n++)
+        {
+            var item = idleItems[n];
+            string lastUsed = lastUse.TryGetValue(item.Id, out var date)
+                ? date.Date > DateTime.Today ? $"最終使用 {date:yyyy/MM/dd}（未来の記録）"
+                    : date.Date == DateTime.Today ? "最終使用 今日"
+                    : $"最終使用 {date:yyyy/MM/dd}（{(DateTime.Today - date.Date).Days:N0}日前）"
+                : "使用記録なし";
+            idlePanel.Children.Add(Ui.Text($"{n + 1}. {item.DisplayName}  /  {lastUsed}", 13));
+        }
         if (items.Count > idleItems.Count) idlePanel.Children.Add(Muted($"ほか {items.Count - idleItems.Count}点"));
         var usagePanel = new StackPanel();
         usagePanel.Children.Add(Ui.Text("使用回数の内訳", 16));
