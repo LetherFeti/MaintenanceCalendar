@@ -25,7 +25,6 @@ MVCに近い役割名でフォルダを整理しています。WPFの画面と�
 | `MaintenanceCalendar/Views/Shared` | 共通画面・コントロール生成・スタイル・アニメーション |
 | `MaintenanceCalendar/Controllers` | 各画面で共有するサービスの組み立てと写真操作の窓口 |
 | `MaintenanceCalendar/Services` | バックアップ、祝日取得、スタートアップ、Windows通知 |
-| `Test` | 独立した検証コード・フィクスチャ・検証資料 |
 
 通常のメソッドと明示的なコンストラクターに、日本語のXMLドキュメントコメント（`summary`）を付けています。モデルとプライマリコンストラクターを持つ型には型の説明を、ローカル関数には処理内容のコメントを記載しています。
 
@@ -50,27 +49,20 @@ MVCに近い役割名でフォルダを整理しています。WPFの画面と�
 
 * `Data/calendar.db`: 所持品、履歴、手入れマスタ、祝日。
 * `Data/Photos`: 長辺最大720pxの写真。コピー元も利用できるよう、差替え後の写真は自動削除しません。
-* `Data/settings.json`: 色・図形・祝日取得時刻・サイドバーの配置と文字表示・ウィンドウ位置と大きさ。
+* `Data/settings.json`: 色・図形・祝日取得時刻・サイドバーの配置と文字表示・ウィンドウ位置と大きさ・カレンダー表示（月/週）と週表示のスクロール位置。
 * `Logs`: NLogの保守ログ。メモ本文や写真内容は記録しません。30日、最大60ファイル、約5MB単位で保持します。
 
 設定画面で `Data/` を含むZIPを作成できます。停止中にアプリフォルダへそのまま展開するか、設定のインポートから復元します。インポート直前のデータは `Data-before-import-日時-識別子` に退避します。必要に応じて退避フォルダを別の場所へ保管してください。
 
 スタートアップはユーザーのスタートアップフォルダに専用ショートカットを作ります。アプリを移動したら再登録してください。お手入れ通知はWindows通知、予定通知は専用ウィンドウで表示します。予定通知は集中モードやプレゼンテーション中には表示を保留し、通知画面にも予定を残します。通知に写真は含めません。
 
-## 検証の実行
+## ビルド確認
 
 ```powershell
-dotnet build Test/MaintenanceCalendar.Test.csproj -c Release
-dotnet Test/bin/Release/net10.0-windows/MaintenanceCalendar.Test.dll --self-test
-dotnet Test/bin/Release/net10.0-windows/MaintenanceCalendar.Test.dll --ui-test
-dotnet Test/bin/Release/net10.0-windows/MaintenanceCalendar.Test.dll --performance-test
+dotnet build MaintenanceCalendar.slnx -c Release
 ```
 
-検証コード・旧DBフィクスチャ・検証記録はすべて `Test/` に集約し、製品のソリューションや配布物から独立しています。`--self-test` は一時DBで機能・旧版DB互換性を検証、`--ui-test` は実WPFコントロールで11画面の生成・描画・一部操作・設定連携、`--online-test` は内閣府CSVの実接続、`--performance-test` は100万件の一時DBで性能を検証します。本番Dataフォルダとは分離します。結果と画面描画はテスト出力先の `Logs` と `Previews` に保存します。
-
-検証が不要になったら `Test/` フォルダを削除できます。製品ソリューションはテストを参照していないため、そのままReleaseビルドできます。製品EXEに検証モードは含めていません。
-
-[設計書](docs/設計書.md) / [検証記録](Test/検証記録.md)
+このソリューションには製品アプリのみが含まれます。自動テストプロジェクトや設計書・検証記録は含まれていません。画面操作や通知などの動作確認は、ビルドしたアプリを起動して行ってください。
 
 ## タスクトレイと入力候補
 
