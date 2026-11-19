@@ -11,26 +11,40 @@ public sealed class DashboardWindow : ToolWindow
         var items = Services.Db.GetItems().ToDictionary(x => x.Id);
         var usage = Services.Db.UsageCounts();
         int due = Services.Db.Due(DateTime.Today).Count;
+        var recentCare = Services.Db.RecentCare();
+        var monthRecords = Services.Db.Month(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1), null);
+        var lastUse = Services.Db.LastUseDates();
         long total = usage.Sum(x => x.Count);
         var metrics = view.Metrics;
         metrics.Children.Add(Metric("登録中", $"{items.Count:N0}", "点"));
         metrics.Children.Add(Metric("使用記録", $"{total:N0}", "回"));
         metrics.Children.Add(Metric("期限到来", $"{due:N0}", "点"));
         var cards = view.Cards;
-        var duePanel = new StackPanel();
-        duePanel.Children.Add(Ui.Text("お手入れのタイミング", 16));
-        double rate = items.Count == 0 ? 0 : (double)due / items.Count;
-        var theme = (Brush)FindResource("AccentBrush");
-        var care = Settings.Brush(Services.Settings.CareColor);
-        duePanel.Children.Add(Chart([(due, theme), (items.Count - due, care)], items.Count == 0 ? "—" : $"{rate:P0}", "期限到来", $"登録中{items.Count}点のうち期限到来{due}点"));
-        duePanel.Children.Add(Legend(theme, $"期限到来  {due:N0}点"));
-        duePanel.Children.Add(Legend(care, $"期限前  {items.Count - due:N0}点"));
-        duePanel.Children.Add(Muted(items.Count == 0 ? "所持品を登録すると表示されます。" : due == 0 ? "今は期限を迎えた所持品はありません。" : "通知から対象の所持品を確認できます。"));
+        var recentPanel = new StackPanel(); recentPanel.Children.Add(Ui.Text("最近のお手入れ", 16));
+        if (recentCare.Count == 0) recentPanel.Children.Add(Muted("お手入れ記録がありません。"));
+        foreach (var row in recentCare)
+            recentPanel.Children.Add(Ui.Text($"{row.Date:yyyy/MM/dd}  {items[row.ItemId].DisplayName}", 13));
+        var monthPanel = new StackPanel(); monthPanel.Children.Add(Ui.Text("今月の記録", 16));
+        int monthUses = monthRecords.Count(x => x.Work == 1), monthCares = monthRecords.Count(x => x.Work == 2);
+        var monthTotal = monthUses + monthCares;
+        var monthNumber = Ui.Text($"{monthTotal:N0}", 30); monthNumber.FontWeight = FontWeights.SemiBold;
+        monthNumber.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush"); monthPanel.Children.Add(monthNumber);
+        monthPanel.Children.Add(Muted($"使用 {monthUses:N0}回  /  お手入れ {monthCares:N0}回"));
+        monthPanel.Children.Add(Muted(monthTotal == 0 ? "今月の記録はありません。" : $"{DateTime.Today:yyyy年M月}の記録"));
+        var idlePanel = new StackPanel(); idlePanel.Children.Add(Ui.Text("しばらく使っていない所持品", 16));
+        var idleItems = items.Values.OrderBy(x => lastUse.TryGetValue(x.Id, out var date) ? date : DateTime.MinValue).ThenBy(x => x.DisplayName).Take(5).ToList();
+        if (idleItems.Count == 0) idlePanel.Children.Add(Muted("所持品が登録されていません。"));
+        foreach (var item in idleItems)
+            idlePanel.Children.Add(Ui.Text(lastUse.TryGetValue(item.Id, out var date)
+                ? $"{item.DisplayName}  /  最終使用 {date:yyyy/MM/dd}（{Math.Max(0, (DateTime.Today - date.Date).Days):N0}日前）"
+                : $"{item.DisplayName}  /  使用記録なし", 13));
+        if (items.Count > idleItems.Count) idlePanel.Children.Add(Muted($"ほか {items.Count - idleItems.Count}点"));
         var usagePanel = new StackPanel();
         usagePanel.Children.Add(Ui.Text("使用回数の内訳", 16));
         var slices = new List<(double Value, Brush Brush)>();
         var labels = new List<(Brush Brush, string Text)>();
         var color = Settings.Brush(Services.Settings.ThemeColor).Color;
+        var care = Settings.Brush(Services.Settings.CareColor);
         for (int n = 0; n < Math.Min(3, usage.Count); n++)
         {
             var brush = new SolidColorBrush(Color.FromRgb(
@@ -58,7 +72,7 @@ public sealed class DashboardWindow : ToolWindow
             oldest.Children.Add(Ui.Text(item.DisplayName, 14));
             oldest.Children.Add(Muted($"購入日 {item.PurchaseDate:yyyy/MM/dd}  /  {(days >= 0 ? $"{days:N0}日経過" : $"購入予定まで{-days:N0}日")}"));
         }
-        foreach (var child in new[] { duePanel, usagePanel, most, oldest }) cards.Children.Add(Card(child));
+        foreach (var child in new[] { recentPanel, monthPanel, idlePanel, usagePanel, most, oldest }) cards.Children.Add(Card(child));
         // 狭い画面では縦一列へ並べ替え、固定幅による欠けを避けます。
         void ArrangeCards()
         {

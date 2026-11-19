@@ -391,6 +391,23 @@ public sealed class Database(string path)
                 select new { Id = g.Key, Count = g.LongCount() })
             .ToList().Select(x => (x.Id, x.Count)).ToList();
     }
+    /// <summary>有効な所持品のお手入れ記録を新しい順に取得します。</summary>
+    public List<HistoryRow> RecentCare(int limit = 5)
+    {
+        using var db = CreateContext();
+        return Rows(db.History.Where(x => x.Work == 2 && db.Items.Any(i => i.Id == x.ItemId && !i.IsDeleted))
+            .OrderByDescending(x => x.Date).ThenBy(x => x.ItemId).Take(Math.Max(0, limit)));
+    }
+    /// <summary>有効な所持品ごとの最終使用日を取得します。</summary>
+    public Dictionary<long, DateTime> LastUseDates()
+    {
+        using var db = CreateContext();
+        return (from h in db.History join i in db.Items on h.ItemId equals i.Id
+                where h.Work == 1 && !i.IsDeleted
+                group h by h.ItemId into g
+                select new { Id = g.Key, Date = g.Max(x => x.Date) })
+            .ToDictionary(x => x.Id, x => x.Date);
+    }
     /// <summary>
     /// 削除済みを含めるか指定して、手入れ概要の定型語句を名前順に取得します。
     /// </summary>
