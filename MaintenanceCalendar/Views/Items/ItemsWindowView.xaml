@@ -5,7 +5,7 @@
         <StackPanel DockPanel.Dock="Top">
             <TextBlock Text="所持品マスタ" FontSize="21" Margin="0,0,0,6"/>
             <TextBlock Text="行を選んで編集・コピー。チェックした行はまとめて削除・復旧できます。" TextWrapping="Wrap" Margin="0,0,0,6"/>
-            <CheckBox x:Name="IncludeDeleted" Content="削除済みも表示" Margin="3,8,3,5"/>
+            <CheckBox x:Name="IncludeDeleted" Content="削除済みのみ表示" Margin="3,8,3,5"/>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
             <Button x:Name="AddButton" Content="追加"/>

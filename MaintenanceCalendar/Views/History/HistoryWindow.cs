@@ -19,16 +19,13 @@ public sealed class HistoryWindow : ToolWindow
     {
         view = new HistoryWindowView(); Root.Children.Add(view);
 
-        var items = Services.Db.GetItems(true);
+        var items = Services.Db.GetItems();
 
         var choices = new List<Item> { new() }; choices.AddRange(items);
         combo.ItemsSource = choices;
         combo.DisplayMemberPath = "DisplayName";
         combo.SelectedValuePath = "Id";
         combo.SelectedValue = selected ?? 0L;
-
-        // Deleted items remain readable without reappearing in the main calendar.
-        foreach (var item in items.Where(x => x.IsDeleted)) item.Model += "（削除済み）";
 
         previous = Ui.Button("PreviousButton", "前へ", Button_Click); Actions.Children.Add(previous);
 

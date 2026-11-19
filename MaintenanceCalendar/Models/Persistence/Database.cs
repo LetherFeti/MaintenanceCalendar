@@ -112,6 +112,18 @@ public sealed class Database(string path)
         int count = db.Items.Where(x => keys.Contains(x.Id)).ExecuteUpdate(s => s.SetProperty(x => x.IsDeleted, deleted));
         Log.Info("Items deletion flag={0}, count={1}", deleted, count);
     }
+    /// <summary>削除済み所持品と、それらに紐づく使用・手入れ履歴を物理削除します。</summary>
+    public void PurgeDeletedItems(IEnumerable<long> ids)
+    {
+        var keys = ids.Distinct().ToArray();
+        if (keys.Length == 0) return;
+        using var db = CreateContext(); using var tx = db.Database.BeginTransaction();
+        if (db.Items.Count(x => keys.Contains(x.Id) && x.IsDeleted) != keys.Length)
+            throw new InvalidDataException("物理削除できる削除済み所持品を確認できませんでした。");
+        db.History.Where(x => keys.Contains(x.ItemId)).ExecuteDelete();
+        db.Items.Where(x => keys.Contains(x.Id) && x.IsDeleted).ExecuteDelete();
+        tx.Commit(); Log.Info("Deleted items purged count={0}", keys.Length);
+    }
     /// <summary>
     /// 指定月と所持品条件に一致する、有効な所持品の作業マークを重複なしで取得します。
     /// </summary>
@@ -134,7 +146,8 @@ public sealed class Database(string path)
     public List<HistoryRow> Day(DateTime date, long? id = null)
     {
         using var db = CreateContext(); date = date.Date;
-        return Rows(db.History.Where(x => x.Date == date && (id == null || x.ItemId == id)));
+        return Rows(db.History.Where(x => x.Date == date && (id == null || x.ItemId == id)
+            && db.Items.Any(i => i.Id == x.ItemId && !i.IsDeleted)));
     }
     /// <summary>
     /// 指定した所持品の履歴を日付降順・作業種別順で上限件数まで取得します。
@@ -146,7 +159,8 @@ public sealed class Database(string path)
     public List<HistoryRow> HistoryPage(long id, int offset, int limit)
     {
         using var db = CreateContext();
-        var query = db.History.Where(x => x.ItemId == id).OrderByDescending(x => x.Date).ThenBy(x => x.Work).Skip(Math.Max(0, offset));
+        var query = db.History.Where(x => x.ItemId == id && db.Items.Any(i => i.Id == x.ItemId && !i.IsDeleted))
+            .OrderByDescending(x => x.Date).ThenBy(x => x.Work).Skip(Math.Max(0, offset));
         return Rows(limit < 0 ? query : query.Take(limit));
     }
     /// <summary>

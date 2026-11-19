@@ -23,7 +23,11 @@ public sealed class ItemsWindow : ToolWindow
     /// <summary>
     /// 削除済み表示の設定に応じて所持品一覧を読み直します。
     /// </summary>
-    private void Refresh() => grid.ItemsSource = Services.Db.GetItems(includeDeleted.IsChecked == true);
+    private void Refresh()
+    {
+        var items = Services.Db.GetItems(includeDeleted.IsChecked == true);
+        grid.ItemsSource = includeDeleted.IsChecked == true ? items.Where(x => x.IsDeleted).ToList() : items;
+    }
 
     /// <summary>
     /// 選択状態に応じて所持品の追加・編集・コピー・論理削除・復旧を実行します。
@@ -45,7 +49,22 @@ public sealed class ItemsWindow : ToolWindow
             if (targets.Count == 0 && grid.SelectedItem is Item selected) targets.Add(selected);
             if (targets.Count == 0) { MessageBox.Show("対象の所持品を選択してください。"); return; }
             bool deleted = name == "DeleteButton";
-            if (Ui.Confirm($"{targets.Count}件を{(deleted ? "論理削除" : "復旧")}しますか？\n履歴は保持されます。")) { Services.Db.SetDeleted(targets.Select(x => x.Id), deleted); Refresh(); }
+            var purgeTargets = deleted && includeDeleted.IsChecked == true ? targets.Where(x => x.IsDeleted).ToList() : [];
+            var softTargets = purgeTargets.Count == 0 ? targets : targets.Where(x => !x.IsDeleted).ToList();
+            string message;
+            if (purgeTargets.Count > 0)
+            {
+                message = $"削除済みの所持品 {purgeTargets.Count}件と関連履歴を物理削除します";
+                if (softTargets.Count > 0) message += $"。有効な所持品 {softTargets.Count}件は論理削除します";
+                message += "か？\n物理削除したデータは取り消せません。";
+            }
+            else message = $"{targets.Count}件を{(deleted ? "論理削除" : "復旧")}しますか？\n履歴は保持されます。";
+            if (Ui.Confirm(message))
+            {
+                if (purgeTargets.Count > 0) Services.Db.PurgeDeletedItems(purgeTargets.Select(x => x.Id));
+                if (softTargets.Count > 0) Services.Db.SetDeleted(softTargets.Select(x => x.Id), deleted);
+                Refresh();
+            }
             return;
         }
 
