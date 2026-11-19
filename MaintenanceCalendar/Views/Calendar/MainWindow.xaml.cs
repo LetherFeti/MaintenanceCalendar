@@ -17,6 +17,7 @@ namespace MaintenanceCalendar;
 
 public partial class MainWindow : Window
 {
+    public static string DisplayTitle => $"お手入れカレンダー  v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version}";
     private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateTime weekStart = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek);
     private bool restoringWeekScroll;
@@ -147,16 +148,22 @@ public partial class MainWindow : Window
             bool use = dayRecords.Any(x => x.Work == 1), care = dayRecords.Any(x => x.Work == 2);
             if (date == DateTime.Today)
             {
-                Shape shape = settings.TodayShape switch { "■" => new Rectangle(), "▼" => new Polygon { Points = new PointCollection([new(0,0), new(1,0), new(0.5,1)]), Stretch = Stretch.Fill }, _ => new Ellipse() };
+                Shape shape = settings.TodayShape switch { "■" => new Rectangle(), "▼" => new Polygon { Points = new PointCollection([new(0, 0), new(1, 0), new(0.5, 1)]), Stretch = Stretch.Fill }, _ => new Ellipse() };
                 shape.Fill = Settings.Brush(settings.TodayColor); shape.Margin = new Thickness(1); visual.Children.Add(shape);
             }
             if (use || care) visual.Children.Add(new Ellipse { Fill = Settings.Brush(use ? settings.UseColor : settings.CareColor), Margin = new Thickness(5) });
             if (care && use) visual.Children.Add(new Ellipse { Stroke = Settings.Brush(settings.CareColor), StrokeThickness = 3, Margin = new Thickness(3) });
             if (events[date].Any()) visual.Children.Add(new Ellipse { Stroke = Settings.Brush(settings.ThemeColor), StrokeThickness = 2, Margin = new Thickness(1) });
             bool holiday = holidays.TryGetValue(date, out var holidayName);
-            var number = new TextBlock { Text = date.Day.ToString(), FontSize = 22, FontFamily = new FontFamily("Segoe UI, Yu Gothic UI"),
-                VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = holiday || date.DayOfWeek == DayOfWeek.Sunday ? Settings.Brush("#BB3030") : date.DayOfWeek == DayOfWeek.Saturday ? Settings.Brush("#2859B0") : (Brush)FindResource("TextBrush") };
+            var number = new TextBlock
+            {
+                Text = date.Day.ToString(),
+                FontSize = 22,
+                FontFamily = new FontFamily("Segoe UI, Yu Gothic UI"),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Foreground = holiday || date.DayOfWeek == DayOfWeek.Sunday ? Settings.Brush("#BB3030") : date.DayOfWeek == DayOfWeek.Saturday ? Settings.Brush("#2859B0") : (Brush)FindResource("TextBrush")
+            };
             if (!holiday && date.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday && (use || care || date == DateTime.Today))
                 number.Foreground = UiPalette.OnColor(Settings.Brush(use ? settings.UseColor : care ? settings.CareColor : settings.TodayColor).Color);
             visual.Children.Add(number);
@@ -206,8 +213,14 @@ public partial class MainWindow : Window
             var eventBrush = Settings.Brush(settings.ThemeColor);
             bool holiday = holidays.TryGetValue(date, out var holidayName);
             var header = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(1, 2, 1, 2) };
-            var dateText = new TextBlock { Text = $"{new[] { "日", "月", "火", "水", "木", "金", "土" }[d]}\n{date:M/d}", FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, TextAlignment = TextAlignment.Center,
-                Foreground = hasEvents ? UiPalette.OnColor(eventBrush.Color) : holiday || d == 0 ? Settings.Brush("#BB3030") : d == 6 ? Settings.Brush("#2859B0") : (Brush)FindResource("TextBrush") };
+            var dateText = new TextBlock
+            {
+                Text = $"{new[] { "日", "月", "火", "水", "木", "金", "土" }[d]}\n{date:M/d}",
+                FontWeight = FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Foreground = hasEvents ? UiPalette.OnColor(eventBrush.Color) : holiday || d == 0 ? Settings.Brush("#BB3030") : d == 6 ? Settings.Brush("#2859B0") : (Brush)FindResource("TextBrush")
+            };
             header.Children.Add(dateText);
             if (holiday) header.Children.Add(new TextBlock { Text = holidayName, FontSize = 9, Foreground = hasEvents ? UiPalette.OnColor(eventBrush.Color) : Settings.Brush("#BB3030"), TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 100 });
             var marksRow = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
@@ -242,8 +255,15 @@ public partial class MainWindow : Window
             int day = (ev.Start.Date - weekStart.Date).Days; if (day < 0 || day > 6) continue;
             int start = Math.Clamp((int)(ev.Start.TimeOfDay.TotalMinutes / 30), 0, 47);
             int finish = Math.Clamp((int)Math.Ceiling(ev.End.TimeOfDay.TotalMinutes / 30), start + 1, 48);
-            var block = new Border { Background = Settings.Brush(settings.ThemeColor), CornerRadius = new CornerRadius(4), Margin = new Thickness(2), Padding = new Thickness(3, 1, 2, 1), ClipToBounds = true,
-                Child = new TextBlock { Text = $"{ev.Start:HH:mm} {ev.Title}", Foreground = Brushes.White, FontSize = 10, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Top } };
+            var block = new Border
+            {
+                Background = Settings.Brush(settings.ThemeColor),
+                CornerRadius = new CornerRadius(4),
+                Margin = new Thickness(2),
+                Padding = new Thickness(3, 1, 2, 1),
+                ClipToBounds = true,
+                Child = new TextBlock { Text = $"{ev.Start:HH:mm} {ev.Title}", Foreground = Brushes.White, FontSize = 10, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Top }
+            };
             Grid.SetRow(block, start); Grid.SetRowSpan(block, Math.Max(1, finish - start)); Grid.SetColumn(block, day + 1); grid.Children.Add(block);
             block.ToolTip = string.Join("\n", new[] { $"{ev.Start:yyyy/MM/dd HH:mm} ～ {ev.End:HH:mm}", ev.Title, ev.Location, ev.Description }.Where(x => !string.IsNullOrWhiteSpace(x)));
             block.Cursor = Cursors.Hand;

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:MaintenanceCalendar"
         mc:Ignorable="d"
         Style="{StaticResource {x:Type Window}}"
-        Title="お手入れカレンダー" Width="450" Height="580" MinWidth="410" MinHeight="540"
+        Title="{x:Static local:MainWindow.DisplayTitle}" Width="450" Height="580" MinWidth="410" MinHeight="540"
         PreviewMouseDown="Window_PreviewMouseDown" PreviewKeyDown="Window_PreviewKeyDown">
     <Window.ContextMenu>
         <ContextMenu Opened="ContextMenu_Opened">
